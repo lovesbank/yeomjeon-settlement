@@ -2517,7 +2517,7 @@ body{
           for (var i = 0; i < cs; i++) w += widths[c + i];
           for (var rr = 0; rr < rs; rr++) for (var cc = 0; cc < cs; cc++) occ[(r + rr) + ',' + (c + cc)] = 1;
           var para = cell.al === 'R' ? 27 : cell.al === 'L' ? 21 : 22;
-          tds += '<hp:tc name="" header="0" hasMargin="' + (mg !== 510 ? 1 : 0) + '" protect="0" editable="0" dirty="0" borderFillIDRef="4">' +
+          tds += '<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="4">' +
             '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">' +
             '<hp:p id="2147483648" paraPrIDRef="' + para + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + (cell.ch || 9) + '"><hp:t>' + xe(cell.t) + '</hp:t></hp:run></hp:p></hp:subList>' +
             '<hp:cellAddr colAddr="' + c + '" rowAddr="' + r + '"/><hp:cellSpan colSpan="' + cs + '" rowSpan="' + rs + '"/>' +
@@ -2611,7 +2611,7 @@ body{
         var kind = tr.classList.contains('sum') ? 'sum' : tr.classList.contains('ref') ? 'ref' : '';
         data.push({ name: kind === 'ref' ? '지출내역서 월합계' : name, ms: ms, tot: tot, kind: kind });
       });
-      // 1월~12월을 한 줄로: A4 세로 본문 폭(53000) 안에 7pt·장평 88% 글자로 「17,500,500」까지 한 줄에 들어감
+      // 1월~12월을 한 줄로: A4 세로 본문 폭(53000) 안에 6pt 글자로 「17,500,500」까지 한 줄에 들어감 (칸 안 여백 0.2mm)
       var F = smallCh || S;
       var head = [{ t: '항  목', ch: F }];
       C.MONTHS.forEach(function (m) { head.push({ t: m + '월', ch: F }); });
@@ -2626,27 +2626,6 @@ body{
       var widths = [6200]; C.MONTHS.forEach(function () { widths.push(3450); }); widths.push(4800);
       var title = '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="11"><hp:t>' + xe('●' + Y + '년 지출 항목별 연간 합계') + '</hp:t></hp:run></hp:p>';
       return title + paraXml('', 9, 'C') + tableXml(rows, widths, 1300, 60);
-    }
-    // 한글 양식에 작은 글자 모양(7pt, 장평 88%)을 하나 추가하고 그 번호를 돌려줌
-    function addSmallCharPr(files) {
-      var hf = files.filter(function (f) { return f.name === 'Contents/header.xml'; })[0];
-      if (!hf) return null;
-      var hd = new DOMParser().parseFromString(new TextDecoder().decode(hf.data), 'application/xml');
-      if (hd.getElementsByTagName('parsererror').length) return null;
-      var list = hd.getElementsByTagNameNS('*', 'charProperties')[0];
-      if (!list) return null;
-      var prs = Array.prototype.filter.call(list.childNodes, function (n) { return n.localName === 'charPr'; });
-      var base = prs.filter(function (n) { return n.getAttribute('id') === '12'; })[0] || prs[0];
-      if (!base) return null;
-      var id = prs.reduce(function (mx, n) { return Math.max(mx, Number(n.getAttribute('id')) || 0); }, 0) + 1;
-      var c = base.cloneNode(true);
-      c.setAttribute('id', String(id)); c.setAttribute('height', '700'); c.setAttribute('textColor', '#000000');
-      var ratio = c.getElementsByTagNameNS('*', 'ratio')[0];
-      if (ratio) ['hangul', 'latin', 'hanja', 'japanese', 'other', 'symbol', 'user'].forEach(function (k) { ratio.setAttribute(k, '88'); });
-      list.appendChild(c);
-      list.setAttribute('itemCnt', String(prs.length + 1));
-      hf.data = new TextEncoder().encode('<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + new XMLSerializer().serializeToString(hd).replace(/^<\?xml[^>]*\?>\s*/, ''));
-      return id;
     }
     // 지출내역서 다음, 「수입. 지출」 앞에 새 쪽으로 넣음 (못 찾으면 맨 끝)
     function insertItems(doc, Y, smallCh) {
@@ -2699,7 +2678,7 @@ body{
         var doc = new DOMParser().parseFromString(new TextDecoder().decode(sf.data), 'application/xml');
         if (doc.getElementsByTagName('parsererror').length) throw new Error('양식 파일을 읽을 수 없습니다');
         fillLedger(doc, Y);
-        insertItems(doc, Y, addSmallCharPr(files));
+        insertItems(doc, Y, 17);   // 원본 양식에 있는 6pt 글자 모양 사용 (양식은 건드리지 않음)
         if ($('hxReport').checked) insertReport(doc);
         var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + new XMLSerializer().serializeToString(doc).replace(/^<\?xml[^>]*\?>\s*/, '');
         sf.data = new TextEncoder().encode(xml);
