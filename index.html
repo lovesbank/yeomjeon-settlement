@@ -540,9 +540,9 @@ body{
   #ledger .lsheet{ background:#fff; margin:0 0 24px; padding:40px 40px 32px; box-shadow:0 1px 4px rgba(0,0,0,.12); scroll-margin-top:64px; }
   #ledger .title-box{
     display:table; margin:0 auto 28px; padding:14px 40px;
-    background:var(--lg-title-bg); color:var(--lg-title-ink);
-    border:2px solid #111; box-shadow:8px 8px 0 #a9a9a9;
-    font-size:20px; font-weight:800; letter-spacing:1px;
+    background:linear-gradient(#ffffff,#c0cdef); color:#1f3a68;
+    border:1.5px solid #1f3a68; text-shadow:2px 2px 0 #cfcfcf;
+    font-size:22px; font-weight:900; letter-spacing:2px;
   }
   #ledger .table-wrap{ overflow-x:auto; }
 
@@ -640,6 +640,7 @@ body{
   #ledger .fs td.b{ font-weight:700; background:#f6f7fb; }
 
   /* 결산 앞장 */
+  #ledger .cv-title, #ledger .off-title, #ledger .rs-title{ display:table; margin:6px auto 18px !important; padding:10px 34px !important; min-width:300px; text-align:center; font-size:26px !important; font-weight:900; color:#1f3a68 !important; letter-spacing:5px; border:1.5px solid #1f3a68 !important; background:linear-gradient(#ffffff,#c0cdef) !important; text-shadow:2px 2px 0 #cfcfcf; width:auto !important; }
   #ledger .cv-title{ text-align:center; font-size:30px; font-weight:900; color:#143a63; margin:4px 0 22px; letter-spacing:1px; }
   #ledger .rs-title{ width:300px; margin:6px auto 20px; padding:10px 0; text-align:center; font-size:24px; font-weight:900; color:#143a63; letter-spacing:6px; border:1.5px solid #143a63; background:linear-gradient(#fff,#c0cdef); }
   #ledger .rs-lead{ text-align:center; font-size:17px; font-weight:700; line-height:1.9; margin-bottom:22px; }
@@ -2935,6 +2936,13 @@ body{
         '<hp:outMargin left="283" right="283" top="283" bottom="283"/><hp:inMargin left="' + mg + '" right="' + mg + '" top="141" bottom="141"/>' +
         trs + '</hp:tbl><hp:t/></hp:run></hp:p>';
     }
+    // 서류 제목: 연한 파랑 그라데이션 상자 + 남색 굵은 글씨(그림자) — 모든 서류 제목을 같은 모양으로
+    function titleBlock(text, pb, h) {
+      var n = String(text).replace(/\s/g, '').length, w = Math.min(50000, Math.max(26000, n * 2600 + 9000));
+      var t = tableXml([[{ t: text, ch: 29, bf: 49 }]], [w], h || 3800);
+      if (pb) t = t.replace('pageBreak="0"', 'pageBreak="1"');
+      return t + paraXml('', 12, 'C');
+    }
     function paraXml(text, ch, align) {
       return '<hp:p id="2147483648" paraPrIDRef="' + (align === 'C' ? 30 : 31) + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + (ch || 9) + '"><hp:t>' + xe(text) + '</hp:t></hp:run></hp:p>';
     }
@@ -3025,8 +3033,8 @@ body{
         rows.push(row);
       });
       var widths = [6200]; C.MONTHS.forEach(function () { widths.push(3450); }); widths.push(4800);
-      var title = '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="11"><hp:t>' + xe('●' + Y + '년 지출 항목별 연간 합계') + '</hp:t></hp:run></hp:p>';
-      return title + paraXml('', 9, 'C') + tableXml(rows, widths, 1650, 60);   // 줄 높이 (수입·지출과 한 장에 들어가게 약간 줄임)
+      var title = titleBlock(Y + '년 지출 항목별 연간 합계', 1, 3000);
+      return title + tableXml(rows, widths, 1650, 60);   // 줄 높이 (수입·지출과 한 장에 들어가게 약간 줄임)
     }
     // 지출내역서 다음, 「수입. 지출」 앞에 새 쪽으로 넣음 (못 찾으면 맨 끝)
     function insertItems(doc, Y, smallCh) {
@@ -3235,7 +3243,7 @@ body{
       // 재무상태표는 한 장, 손익계산서와 이익잉여금처분계산서는 A4 한 장에 이어서 (새 쪽 안 넘김)
       [['재 무 상 태 표', O.bsHead, O.bs, 1, O.nbs], ['손 익 계 산 서', O.plHead, O.pl, 1, O.npl], ['이익잉여금처분계산서', O.plHead, O.re, 1, O.nre]].forEach(function (T) {
         if (!T[3]) out += paraXml('', N, 'C');
-        out += '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="' + T[3] + '" columnBreak="0" merged="0"><hp:run charPrIDRef="29"><hp:t>' + xe(T[0]) + '</hp:t></hp:run></hp:p>';
+        out += titleBlock(T[0], T[3]);
         T[1].filter(Boolean).forEach(function (x) { out += paraXml(x, N, 'C'); });
         out += paraXml('회사명 : 염전마을주민발전주식회사                                         (단위 : 원)', N, 'L');
         // 색 (원본 양식에 있는 것만 사용 → 양식 안 건드림): 머리줄·핵심 줄 = 연한 파랑 바탕(49), 소계 = 남색 굵게(25), 최종 금액 = 빨강(13)
@@ -3396,7 +3404,7 @@ body{
     function cmpXml(Y) {
       var D = cmpData(); if (!D) return '';
       var NAVY = 25, HEAD = 49, N10 = 9, out = '';
-      out += '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="29"><hp:t>' + xe('전년 대비 실적 비교') + '</hp:t></hp:run></hp:p>';
+      out += titleBlock('전년 대비 실적 비교', 1);
       out += paraXml(D.P + '년과 ' + D.Y + '년의 1월 ~ ' + D.K + '월 비교', N10, 'C') + paraXml('회사명 : 염전마을주민발전주식회사                                         (단위 : 원)', N10, 'L');
       var rows = [['구  분', D.P + '년', D.Y + '년', '증  감', '증감률'].map(function (t) { return { t: t, ch: NAVY, bf: HEAD }; })];
       D.rows.forEach(function (r) {
@@ -3432,7 +3440,7 @@ body{
     function tocXml(Y, withReport) {
       var NAVY = 25, HEAD = 49, B13 = 39, H13 = 11, T = db.toc || {};
       var pg = TOC_LIST.map(function (x, i) { return String((+T[i] || TOC_GUESS[i]) + (withReport ? 1 : 0)); });
-      var out = '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="29"><hp:t>' + xe('차    례') + '</hp:t></hp:run></hp:p>';
+      var out = titleBlock('차    례', 1);
       out += paraXml('', B13, 'C') + paraXml('', B13, 'C');
       var rows = [['번호', '서    류', '내    용', '쪽'].map(function (t) { return { t: t, ch: H13, bf: HEAD }; })];
       TOC_LIST.forEach(function (x, i) { rows.push([{ t: String(i + 1), ch: B13 }, { t: x[0], al: 'L', ch: H13 }, { t: x[1], al: 'L', ch: B13 }, { t: pg[i], ch: B13 }]); });
@@ -3480,7 +3488,7 @@ body{
     })();
     function bizXml(Y) {
       var N = bizNumbers(), c = cover(), w = C.formatWon, B13 = 39, H13 = 11, HEAD = 49, N10 = 9, NAVY = 25, out = '';
-      out += '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="29"><hp:t>' + xe('영 업 보 고 서') + '</hp:t></hp:run></hp:p>';
+      out += titleBlock('영 업 보 고 서', 1);
       out += paraXml(bizHead(N), N10, 'C') + paraXml('', N10, 'C');
       out += paraXml('1. 회사의 개요', H13, 'L');
       out += tableXml([['회 사 명', '염전마을주민발전주식회사'], ['대표이사', ceoName()], ['소 재 지', '전라남도 영광군 백수읍'], ['발전소 위치', bizInfo().loc], ['발전 설비 용량', bizInfo().cap || ''], ['발전 시작', bizInfo().since],
@@ -3506,7 +3514,7 @@ body{
     }
     function auditXml(Y) {
       var N = bizNumbers(), B13 = 39, H13 = 11, out = '';
-      out += '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="29"><hp:t>' + xe('감 사 보 고 서') + '</hp:t></hp:run></hp:p>';
+      out += titleBlock('감 사 보 고 서', 1);
       out += paraXml('', B13, 'C') + paraXml('염전마을주민발전주식회사 주주총회 귀중', H13, 'L') + paraXml('', B13, 'C');
       auditLines(N).forEach(function (x) {
         if (x[0]) out += paraXml(x[0], H13, 'L');
@@ -3578,7 +3586,7 @@ body{
     function coverXml(Y) {
       // 본문 13pt(39), 제목·표 머리 13pt 남색 굵게(11), 표 머리·첫 칸·합계 = 연한 파랑 바탕(49)
       var c = cover(), B13 = 39, H13 = 11, HEAD = 49, amt = c.shares * c.parValue, out = '';
-      out += '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="29"><hp:t>' + xe('< ' + Y + '년도 결산 보고서 >') + '</hp:t></hp:run></hp:p>';
+      out += titleBlock(Y + '년도 결산 보고서', 1);
       out += paraXml('', B13, 'C') + paraXml('1) 회사의 목적', H13, 'L') + paraXml('   ① ' + c.purpose, B13, 'L');
       if (c.purpose2) out += paraXml('   ② ' + c.purpose2, B13, 'L');
       out += paraXml('', B13, 'C') + paraXml('2) 조직과 인원현황', H13, 'L');
@@ -3753,7 +3761,7 @@ body{
       var box = $('titleBox'); if (!box) return;
       if (!box.querySelector('#tpTitle')) {
         box.innerHTML = '<div class="tp-form no-print"><label>표지 제목 <input id="tpTitle"></label><label>총회 날짜 <input id="tpDate" type="date"></label></div><img class="tp-img" id="tpImg" alt="표지">' +
-          '<p class="bz-hint no-print">한글 파일 맨 앞(결산 보고서를 넣으면 그 바로 뒤)에 이 모양 그대로 한 장으로 들어갑니다. 제목을 비우면 「' + year + '년 정기주주총회 결산서」로 자동.</p>';
+          '<p class="bz-hint no-print">한글 파일 맨 앞(결산 보고서를 넣으면 그 바로 뒤)에 이 모양으로 한 장 들어갑니다. 한글에서 글자를 직접 고칠 수도 있습니다. 제목을 비우면 「' + year + '년 정기주주총회 결산서」로 자동.</p>';
         box.addEventListener('input', function (e) {
           if (e.target.id === 'tpTitle') titleData().title = e.target.value.trim();
           else if (e.target.id === 'tpDate') titleData().date = e.target.value;
@@ -3768,6 +3776,12 @@ body{
     }
     function paintTitle() { var im = $('tpImg'); if (im) try { im.src = drawTitlePage().toDataURL('image/png'); } catch (e) { } }
     if (!sealImgEl.complete) sealImgEl.onload = function () { try { paintTitle(); } catch (e) { } };
+    function ensureSeal(files) {
+      if (files.some(function (f) { return f.name === 'BinData/sealimg.png'; })) return;
+      var bin = atob(SEAL_PNG), u8 = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      addBin(files, 'sealimg', u8);
+    }
     function addBin(files, id, u8) {
       files.push({ name: 'BinData/' + id + '.png', data: u8 });
       var hpf = files.filter(function (f) { return f.name === 'Contents/content.hpf'; })[0];
@@ -3777,23 +3791,67 @@ body{
         hpf.data = new TextEncoder().encode(t);
       }
     }
-    function titleXml(files) {
-      if (!files) return '';
-      var c = drawTitlePage(), b64 = c.toDataURL('image/png').split(',')[1], bin = atob(b64), u8 = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-      files.filter(function (f) { return f.name === 'BinData/titlepage.png'; }).forEach(function (f) { files.splice(files.indexOf(f), 1); });
-      addBin(files, 'titlepage', u8);
-      var w = 53000, h = Math.round(w * c.height / c.width), dw = c.width * 75, dh = c.height * 75;
-      return '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="9">' +
-        '<hp:pic id="1237872099" zOrder="901" numberingType="PICTURE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="164130299" reverse="0">' +
+    // 표지용 큰 글자 모양 3개를 header.xml에 「글자로만」 덧붙임 (기존 모양은 그대로, 문서 구조를 다시 쓰지 않음)
+    var TP_CH = { title: 44, co: 45, date: 46 };
+    function addTitleCharPrs(files) {
+      var hf = files.filter(function (f) { return f.name === 'Contents/header.xml'; })[0]; if (!hf) return false;
+      var x = new TextDecoder().decode(hf.data);
+      if (x.indexOf('<hh:charPr id="' + TP_CH.title + '"') >= 0) return true;
+      var m = x.match(/<hh:charProperties itemCnt="(\d+)">/), base = x.match(/<hh:charPr id="29"[\s\S]*?<\/hh:charPr>/);
+      if (!m || !base || +m[1] !== TP_CH.title) return false;   // 양식이 다르면 덧붙이지 않음
+      base = base[0];
+      function mk(id, h, color, spacing, ratio, shadow) {
+        return base.replace('id="29"', 'id="' + id + '"').replace('height="1800"', 'height="' + h + '"').replace('textColor="#003366"', 'textColor="' + color + '"')
+          .replace(/<hh:spacing [^>]*\/>/, '<hh:spacing hangul="' + spacing + '" latin="' + spacing + '" hanja="' + spacing + '" japanese="' + spacing + '" other="' + spacing + '" symbol="' + spacing + '" user="' + spacing + '"/>')
+          .replace(/<hh:ratio [^>]*\/>/, '<hh:ratio hangul="' + ratio + '" latin="' + ratio + '" hanja="' + ratio + '" japanese="' + ratio + '" other="' + ratio + '" symbol="' + ratio + '" user="' + ratio + '"/>')
+          .replace(/<hh:shadow [^>]*\/>/, shadow ? '<hh:shadow type="CONTINUOUS" color="#BBBBBB" offsetX="8" offsetY="8"/>' : '<hh:shadow type="NONE" color="#B2B2B2" offsetX="10" offsetY="10"/>');
+      }
+      var add = mk(TP_CH.title, 3600, '#1F3A68', 0, 95, 1) + mk(TP_CH.co, 2500, '#1F3A68', 20, 95, 1) + mk(TP_CH.date, 2000, '#000000', 0, 100, 0);
+      x = x.replace(m[0], '<hh:charProperties itemCnt="' + (+m[1] + 3) + '">').replace('</hh:charProperties>', add + '</hh:charProperties>');
+      hf.data = new TextEncoder().encode(x);
+      return true;
+    }
+    function canvasU8(c) { var b = atob(c.toDataURL('image/png').split(',')[1]), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+    function drawBar(top) {   // 표지 초록 줄 (187mm × 3.4mm)
+      var c = document.createElement('canvas'), W = 2244, H = 40; c.width = W; c.height = H;
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+      if (top) { g.fillStyle = '#9af55a'; g.fillRect(0, 0, W * 0.44, H); g.fillRect(W * 0.44, H - 8, W * 0.56, 7); }
+      else { g.fillStyle = '#43963f'; g.fillRect(0, H - 8, W * 0.57, 7); g.fillRect(W * 0.57, 0, W * 0.43, H); }
+      return c;
+    }
+    function picXml(id, bin, w, h, pxW, pxH, pos, wrap, z) {
+      var dw = pxW * 75, dh = pxH * 75;
+      return '<hp:pic id="' + id + '" zOrder="' + z + '" numberingType="PICTURE" textWrap="' + wrap + '" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="' + (id - 1000) + '" reverse="0">' +
         '<hp:offset x="0" y="0"/><hp:orgSz width="' + w + '" height="' + h + '"/><hp:curSz width="0" height="0"/><hp:flip horizontal="0" vertical="0"/>' +
-        '<hp:rotationInfo angle="0" centerX="' + (w / 2) + '" centerY="' + Math.round(h / 2) + '" rotateimage="1"/><hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
-        '<hc:img binaryItemIDRef="titlepage" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
+        '<hp:rotationInfo angle="0" centerX="' + Math.round(w / 2) + '" centerY="' + Math.round(h / 2) + '" rotateimage="1"/><hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
+        '<hc:img binaryItemIDRef="' + bin + '" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
         '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + w + '" y="0"/><hc:pt2 x="' + w + '" y="' + h + '"/><hc:pt3 x="0" y="' + h + '"/></hp:imgRect>' +
         '<hp:imgClip left="0" right="' + dw + '" top="0" bottom="' + dh + '"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="' + dw + '" dimheight="' + dh + '"/><hp:effects/>' +
-        '<hp:sz width="' + w + '" widthRelTo="ABSOLUTE" height="' + h + '" heightRelTo="ABSOLUTE" protect="0"/>' +
-        '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>' +
-        '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>표지</hp:shapeComment></hp:pic><hp:t/></hp:run></hp:p>';
+        '<hp:sz width="' + w + '" widthRelTo="ABSOLUTE" height="' + h + '" heightRelTo="ABSOLUTE" protect="0"/>' + pos +
+        '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>그림</hp:shapeComment></hp:pic>';
+    }
+    var INLINE = '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>';
+    // 표지: 글자는 한글에서 고칠 수 있는 진짜 글자, 초록 줄만 그림
+    function titleXml(files) {
+      if (!files || !addTitleCharPrs(files)) return '';
+      ensureSeal(files);
+      ['tpbar1', 'tpbar2'].forEach(function (id, i) {
+        files.filter(function (f) { return f.name === 'BinData/' + id + '.png'; }).forEach(function (f) { files.splice(files.indexOf(f), 1); });
+        addBin(files, id, canvasU8(drawBar(i === 0)));
+      });
+      var D = titleDate(), T = TP_CH, out = '';
+      function P(text, ch, para, pb) { return '<hp:p id="2147483648" paraPrIDRef="' + para + '" styleIDRef="0" pageBreak="' + (pb || 0) + '" columnBreak="0" merged="0"><hp:run charPrIDRef="' + ch + '"><hp:t>' + xe(text) + '</hp:t></hp:run></hp:p>'; }
+      function blank(n) { var o = ''; for (var i = 0; i < n; i++) o += P('', T.title, 30); return o; }
+      function bar(id, bin) { return '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="9">' + picXml(id, bin, 53000, 960, 2244, 40, INLINE, 'TOP_AND_BOTTOM', 902) + '<hp:t/></hp:run></hp:p>'; }
+      out += P(D.no ? '문서번호:  ' + D.no : ' ', 9, 27, 1);
+      out += bar(1237872101, 'tpbar1') + blank(1) + P(titleText(), T.title, 30) + blank(1) + bar(1237872102, 'tpbar2');
+      out += blank(7) + P(D.txt, T.date, 30) + blank(5);
+      // 직인: 회사 이름 줄 바로 위 빈 줄에 걸어 두고 (인) 위로 내려 겹치게 (글자 뒤)
+      var seal = picXml(1237872103, 'sealimg', 6300, 6200, 293, 288,
+        '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="1500" horzOffset="47300"/>', 'BEHIND_TEXT', 903);
+      out += '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + T.title + '">' + seal + '<hp:t/></hp:run></hp:p>';
+      out += '<hp:p id="2147483648" paraPrIDRef="27" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + T.co + '"><hp:t>' + xe('염 전 마 을 주 민 발 전 주 식 회 사') + '</hp:t></hp:run><hp:run charPrIDRef="' + T.date + '"><hp:t>' + xe('        (인)  ') + '</hp:t></hp:run></hp:p>';
+      return out;
     }
     function insertResolution(doc, Y, files) {
       var sec = doc.documentElement, ps = kids(sec, 'p');
@@ -3809,7 +3867,7 @@ body{
       if (!after) return;
       var c = cover(), B13 = 39, H13 = 11, HEAD = 49, S11 = 6, out = '';
       out += paraXml('', 9, 'C') + paraXml('', 9, 'C');
-      out += tableXml([[{ t: '이 사 회   결 의 서', ch: 29, bf: HEAD }]], [26820], 3600);
+      out += titleBlock('이 사 회   결 의 서', 0);
       out += paraXml('', 9, 'C');
       out += paraXml('이사회의 의결로서 이와 같이 (' + Y + '.01.01 ~ ' + Y + '.12.31)', 40, 'C');
       out += paraXml('', B13, 'C') + paraXml('결산 보고서를 제출합니다.', 40, 'C') + paraXml('', B13, 'C') + paraXml('', B13, 'C');
@@ -3842,15 +3900,49 @@ body{
       var ref = after.nextSibling;
       Array.prototype.slice.call(frag.documentElement.childNodes).forEach(function (n) { sec.insertBefore(doc.importNode(n, true), ref); });
       // 직인 그림 파일을 한글 파일 안에 넣고 목록(content.hpf)에 등록 (header.xml은 그대로)
-      var bin = atob(SEAL_PNG), u8 = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-      files.push({ name: 'BinData/sealimg.png', data: u8 });
-      var hpf = files.filter(function (f) { return f.name === 'Contents/content.hpf'; })[0];
-      if (hpf) {
-        var t = new TextDecoder().decode(hpf.data);
-        if (t.indexOf('BinData/sealimg.png') < 0) t = t.replace('</opf:manifest>', '<opf:item id="sealimg" href="BinData/sealimg.png" media-type="image/png" isEmbeded="1"/></opf:manifest>');
-        hpf.data = new TextEncoder().encode(t);
-      }
+      ensureSeal(files);
+    }
+    // 원본 양식 표 제목(매출액·지출내역서·수입·지출·현재통장 잔액)의 연두색 사각형을 새 제목 상자로 바꿈
+    function restyleTitles(doc, Y) {
+      var sec = doc.documentElement;
+      // 지출내역서 7~12월 표: 원본에 제목이 없어 위가 비어 있음 → 빈 줄을 지우고 제목 상자를 넣고 새 쪽에서 시작
+      kids(sec, 'p').some(function (p) {
+        if (!p.getElementsByTagNameNS(HP, 'tbl').length || p.getElementsByTagNameNS(HP, 'rect').length) return false;
+        if (!/^월일내역금액월일내역금액7월/.test((p.textContent || '').replace(/\s+/g, ''))) return false;
+        for (var q = p.previousSibling; q; ) {
+          var prev = q.previousSibling;
+          if (q.nodeType === 1 && q.localName === 'p' && !(q.textContent || '').trim() && !q.getElementsByTagNameNS(HP, 'tbl').length && !q.getElementsByTagNameNS(HP, 'pic').length && !q.getElementsByTagNameNS(HP, 'rect').length && !q.getElementsByTagNameNS(HP, 'secPr').length) sec.removeChild(q);
+          else if (q.nodeType === 1) break;
+          q = prev;
+        }
+        var frag = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '">' + titleBlock(Y + '년 지출내역서 (7월 ~ 12월)', 1, 3000) + '</root>', 'application/xml');
+        Array.prototype.slice.call(frag.documentElement.childNodes).forEach(function (n) { sec.insertBefore(doc.importNode(n, true), p); });
+        p.setAttribute('pageBreak', '0');
+        return true;
+      });
+      kids(sec, 'p').forEach(function (p) {
+        var rects = Array.prototype.slice.call(p.getElementsByTagNameNS(HP, 'rect')); if (!rects.length) return;
+        rects.forEach(function (rc) {
+          var txt = Array.prototype.map.call(rc.getElementsByTagNameNS(HP, 't'), function (t) { return t.textContent; }).join('');
+          txt = txt.replace(/^[\s●•]+/, '').replace(/\s+/g, ' ').replace(/(\d+월)(\d+일)/, '$1 $2').replace('수입. 지출', '수입 · 지출').replace(/지출내역서$/, '지출내역서 (1월 ~ 6월)').trim();
+          if (!txt || !/매출액|지출내역서|수입|통장/.test(txt)) return;
+          var hasTbl = p.getElementsByTagNameNS(HP, 'tbl').length > 0, pb = p.getAttribute('pageBreak') === '1';
+          if (/지출내역서/.test(txt)) {   // 제목이 앞 장 끝에 홀로 남지 않게: 앞 빈 줄을 지우고 새 쪽에서 시작
+            pb = true;
+            for (var q = p.previousSibling; q; ) {
+              var pv = q.previousSibling;
+              if (q.nodeType === 1 && q.localName === 'p' && !(q.textContent || '').trim() && !q.getElementsByTagNameNS(HP, 'tbl').length && !q.getElementsByTagNameNS(HP, 'pic').length && !q.getElementsByTagNameNS(HP, 'rect').length && !q.getElementsByTagNameNS(HP, 'secPr').length) sec.removeChild(q);
+              else if (q.nodeType === 1) break;
+              q = pv;
+            }
+          }
+          var frag = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '">' + titleBlock(txt, pb, 3000) + '</root>', 'application/xml');
+          if (frag.getElementsByTagName('parsererror').length) return;
+          Array.prototype.slice.call(frag.documentElement.childNodes).forEach(function (n) { sec.insertBefore(doc.importNode(n, true), p); });
+          if (hasTbl) { rc.parentNode.removeChild(rc); p.setAttribute('pageBreak', '0'); }
+          else sec.removeChild(p);
+        });
+      });
     }
     function useMalgun(files) {
       var hf = files.filter(function (f) { return f.name === 'Contents/header.xml'; })[0]; if (!hf) return;
@@ -3878,7 +3970,8 @@ body{
         shrinkIncome(doc);   // 수입·지출 표를 약간 작게 (항목별 표와 한 장에)
         useMalgun(files);   // 모든 글꼴을 맑은 고딕으로
         insertItems(doc, Y, 17);
-        insertResolution(doc, Y, files);   // 「현재통장 잔액」은 새 쪽부터 + 그 아래 이사회 결의서(회사 직인)
+        insertResolution(doc, Y, files);
+        restyleTitles(doc, Y);   // 원본 양식의 연두색 제목 상자 → 다른 서류와 같은 제목 상자   // 「현재통장 잔액」은 새 쪽부터 + 그 아래 이사회 결의서(회사 직인)
         insertReport(doc, $('hxReport').checked, Y, files);   // 맨 앞: 결산 보고서 → 공식 양식 재무상태표·손익계산서·이익잉여금처분계산서
         var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + new XMLSerializer().serializeToString(doc).replace(/^<\?xml[^>]*\?>\s*/, '');
         sf.data = new TextEncoder().encode(xml);
