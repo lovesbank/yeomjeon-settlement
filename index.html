@@ -2597,7 +2597,7 @@ body{
     }
 
     /* ── 지출 항목별 연간 합계 → 한글 표 (상반기 1~6월 / 하반기 7~12월 두 표) ── */
-    function itemsXml(Y) {
+    function itemsXml(Y, smallCh) {
       renderItems();
       var tbl = $('itemsTable'), BOLD = 10, S = 12, data = [];
       Array.prototype.forEach.call(tbl.querySelectorAll('tbody tr'), function (tr) {
@@ -2611,30 +2611,47 @@ body{
         var kind = tr.classList.contains('sum') ? 'sum' : tr.classList.contains('ref') ? 'ref' : '';
         data.push({ name: kind === 'ref' ? '지출내역서 월합계' : name, ms: ms, tot: tot, kind: kind });
       });
-      function half(h) { return function (r) { var t = 0; for (var i = h * 6; i < h * 6 + 6; i++) t += C.parseWon(r.ms[i]) || 0; return t ? C.formatWon(t) : ''; }; }
-      function build(h) {
-        var head = [{ t: '항  목', ch: BOLD }], months = [];
-        for (var m = h * 6 + 1; m <= h * 6 + 6; m++) { head.push({ t: m + '월', ch: BOLD }); months.push(m - 1); }
-        head.push({ t: h === 0 ? '상반기 합계' : '하반기 합계', ch: BOLD });
-        if (h === 1) head.push({ t: '연간 합계', ch: BOLD });
-        var rows = [head];
-        data.forEach(function (r) {
-          var ch = r.kind ? BOLD : S, row = [{ t: r.name, ch: r.kind ? BOLD : 9 }];
-          months.forEach(function (i) { row.push({ t: r.ms[i], al: 'R', ch: ch }); });
-          row.push({ t: half(h)(r), al: 'R', ch: ch });
-          if (h === 1) row.push({ t: r.tot, al: 'R', ch: r.kind === 'ref' ? ch : 16 });
-          rows.push(row);
-        });
-        return h === 0 ? tableXml(rows, [9000, 5500, 5500, 5500, 5500, 5500, 5500, 8000], 1500, 300)
-                       : tableXml(rows, [8000, 5000, 5000, 5000, 5000, 5000, 5000, 6000, 6000], 1500, 250);
-      }
+      // 1월~12월을 한 줄로: A4 세로 본문 폭(53000) 안에 7pt·장평 88% 글자로 「17,500,500」까지 한 줄에 들어감
+      var F = smallCh || S;
+      var head = [{ t: '항  목', ch: F }];
+      C.MONTHS.forEach(function (m) { head.push({ t: m + '월', ch: F }); });
+      head.push({ t: '연간 합계', ch: F });
+      var rows = [head];
+      data.forEach(function (r) {
+        var row = [{ t: r.name, ch: F }];
+        r.ms.forEach(function (v) { row.push({ t: v, al: 'R', ch: F }); });
+        row.push({ t: r.tot, al: 'R', ch: F });
+        rows.push(row);
+      });
+      var widths = [6200]; C.MONTHS.forEach(function () { widths.push(3450); }); widths.push(4800);
       var title = '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="11"><hp:t>' + xe('●' + Y + '년 지출 항목별 연간 합계') + '</hp:t></hp:run></hp:p>';
-      return title + paraXml('', 9, 'C') + paraXml('(1월 ~ 6월)', 9, 'L') + build(0) + paraXml('', 9, 'C') + paraXml('(7월 ~ 12월)', 9, 'L') + build(1);
+      return title + paraXml('', 9, 'C') + tableXml(rows, widths, 1300, 60);
+    }
+    // 한글 양식에 작은 글자 모양(7pt, 장평 88%)을 하나 추가하고 그 번호를 돌려줌
+    function addSmallCharPr(files) {
+      var hf = files.filter(function (f) { return f.name === 'Contents/header.xml'; })[0];
+      if (!hf) return null;
+      var hd = new DOMParser().parseFromString(new TextDecoder().decode(hf.data), 'application/xml');
+      if (hd.getElementsByTagName('parsererror').length) return null;
+      var list = hd.getElementsByTagNameNS('*', 'charProperties')[0];
+      if (!list) return null;
+      var prs = Array.prototype.filter.call(list.childNodes, function (n) { return n.localName === 'charPr'; });
+      var base = prs.filter(function (n) { return n.getAttribute('id') === '12'; })[0] || prs[0];
+      if (!base) return null;
+      var id = prs.reduce(function (mx, n) { return Math.max(mx, Number(n.getAttribute('id')) || 0); }, 0) + 1;
+      var c = base.cloneNode(true);
+      c.setAttribute('id', String(id)); c.setAttribute('height', '700'); c.setAttribute('textColor', '#000000');
+      var ratio = c.getElementsByTagNameNS('*', 'ratio')[0];
+      if (ratio) ['hangul', 'latin', 'hanja', 'japanese', 'other', 'symbol', 'user'].forEach(function (k) { ratio.setAttribute(k, '88'); });
+      list.appendChild(c);
+      list.setAttribute('itemCnt', String(prs.length + 1));
+      hf.data = new TextEncoder().encode('<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + new XMLSerializer().serializeToString(hd).replace(/^<\?xml[^>]*\?>\s*/, ''));
+      return id;
     }
     // 지출내역서 다음, 「수입. 지출」 앞에 새 쪽으로 넣음 (못 찾으면 맨 끝)
-    function insertItems(doc, Y) {
+    function insertItems(doc, Y, smallCh) {
       var sec = doc.documentElement;
-      var frag = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '">' + itemsXml(Y) + '</root>', 'application/xml');
+      var frag = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '">' + itemsXml(Y, smallCh) + '</root>', 'application/xml');
       if (frag.getElementsByTagName('parsererror').length) throw new Error('항목별 합계 변환 오류');
       var ref = null;
       kids(sec, 'p').some(function (p) {
@@ -2645,7 +2662,19 @@ body{
         if (/수입\.\s*지출/.test(t)) { ref = p; return true; }
         return false;
       });
+      var at = ref;
+      // 「수입. 지출」 바로 앞 빈 줄들(빈 쪽을 만드는 원인)을 건너뛰고 지출내역서 표 바로 뒤에 넣음
+      while (at && at.previousSibling) {
+        var pv = at.previousSibling;
+        if (pv.nodeType !== 1) { at = pv; continue; }
+        if (pv.localName !== 'p' || pv.getElementsByTagNameNS(HP, 'tbl').length || (pv.textContent || '').trim()) break;
+        at = pv;
+      }
+      // 그 빈 줄들은 지움 (항목별 표 뒤에 남으면 빈 쪽이 생김) → 「수입. 지출」은 새 쪽에서 시작
+      var gone = [];
+      for (var n = at; n && n !== ref; n = n.nextSibling) gone.push(n);
       Array.prototype.slice.call(frag.documentElement.childNodes).forEach(function (n) { sec.insertBefore(doc.importNode(n, true), ref); });
+      gone.forEach(function (n) { sec.removeChild(n); });
       if (ref) ref.setAttribute('pageBreak', '1');
     }
 
@@ -2670,7 +2699,7 @@ body{
         var doc = new DOMParser().parseFromString(new TextDecoder().decode(sf.data), 'application/xml');
         if (doc.getElementsByTagName('parsererror').length) throw new Error('양식 파일을 읽을 수 없습니다');
         fillLedger(doc, Y);
-        insertItems(doc, Y);
+        insertItems(doc, Y, addSmallCharPr(files));
         if ($('hxReport').checked) insertReport(doc);
         var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + new XMLSerializer().serializeToString(doc).replace(/^<\?xml[^>]*\?>\s*/, '');
         sf.data = new TextEncoder().encode(xml);
