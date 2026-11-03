@@ -2038,7 +2038,18 @@ body{
     $('btnExport').addEventListener('click', function () {
       var t = new Date();
       var a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
+      // 백업에 「항목별 연간 합계」 결과도 함께 넣음 (빈 줄 3칸은 장부 자료 items 안에 이미 저장됨)
+      var out = JSON.parse(JSON.stringify(db)), keep = year, rep = {};
+      try {
+        years().forEach(function (y) {
+          year = y;
+          var G = itemGroups(), list = G.list.slice().sort(function (a, b) { return b.total - a.total; });
+          if (G.etc.names.length || G.etc.total) list.push(G.etc);
+          rep[y] = list.map(function (g) { var m = {}; C.MONTHS.forEach(function (k) { m[k] = g.m[k] || 0; }); return { 항목: g.key, 묶인이름: g.names, 월별: m, 연간합계: g.total }; });
+        });
+      } finally { year = keep; }
+      out.itemsReport = rep;
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
       a.download = '수입지출_백업_' + t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + '.json';
       document.body.appendChild(a);
       a.click();
@@ -2053,6 +2064,7 @@ body{
           var d = JSON.parse(r.result);
           if (!d || !d.years || !Object.keys(d.years).length) throw new Error('형식 오류');
           if (!window.confirm('지금 장부를 백업 파일 내용으로 바꿉니다. 계속할까요?')) return;
+          delete d.itemsReport;   // 항목별 합계는 불러온 뒤 장부에서 다시 계산
           db = d;
           start();
         } catch (err) { window.alert('백업 파일을 읽을 수 없습니다: ' + err.message); }
@@ -2494,7 +2506,8 @@ body{
     function xe(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     var tblSeq = 1900000000;
     // rows: [[{t, cs, rs, al:'C'|'R'|'L', ch: charPr}], ...], widths: 열 너비(HWPUNIT), h: 행 높이
-    function tableXml(rows, widths, h) {
+    function tableXml(rows, widths, h, mg) {
+      mg = mg == null ? 510 : mg;   // 칸 안 좌우 여백
       var occ = {}, trs = '', H = 0;
       rows.forEach(function (row, r) {
         var c = 0, tds = '';
@@ -2508,7 +2521,7 @@ body{
             '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">' +
             '<hp:p id="2147483648" paraPrIDRef="' + para + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + (cell.ch || 9) + '"><hp:t>' + xe(cell.t) + '</hp:t></hp:run></hp:p></hp:subList>' +
             '<hp:cellAddr colAddr="' + c + '" rowAddr="' + r + '"/><hp:cellSpan colSpan="' + cs + '" rowSpan="' + rs + '"/>' +
-            '<hp:cellSz width="' + w + '" height="' + (h * rs) + '"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>';
+            '<hp:cellSz width="' + w + '" height="' + (h * rs) + '"/><hp:cellMargin left="' + mg + '" right="' + mg + '" top="141" bottom="141"/></hp:tc>';
           c += cs;
         });
         trs += '<hp:tr>' + tds + '</hp:tr>';
@@ -2583,6 +2596,59 @@ body{
       return out.join('');
     }
 
+    /* ── 지출 항목별 연간 합계 → 한글 표 (상반기 1~6월 / 하반기 7~12월 두 표) ── */
+    function itemsXml(Y) {
+      renderItems();
+      var tbl = $('itemsTable'), BOLD = 10, S = 12, data = [];
+      Array.prototype.forEach.call(tbl.querySelectorAll('tbody tr'), function (tr) {
+        if (tr.cells.length < 14) return;
+        var nameIn = tr.querySelector('input.iname'), b = tr.cells[0].querySelector('b');
+        var name = nameIn ? nameIn.value.trim() : (b ? b.textContent : tr.cells[0].textContent).replace(/\s+/g, ' ').trim();
+        var ms = [];
+        for (var i = 1; i <= 12; i++) { var c = tr.cells[i], inp = c.querySelector('input'); ms.push(((inp ? inp.value : c.textContent) || '').trim()); }
+        var tot = tr.cells[13].textContent.trim();
+        if (tr.classList.contains('spare') && !name && !ms.some(Boolean)) return;   // 비어 있는 빈 줄은 빼기
+        var kind = tr.classList.contains('sum') ? 'sum' : tr.classList.contains('ref') ? 'ref' : '';
+        data.push({ name: kind === 'ref' ? '지출내역서 월합계' : name, ms: ms, tot: tot, kind: kind });
+      });
+      function half(h) { return function (r) { var t = 0; for (var i = h * 6; i < h * 6 + 6; i++) t += C.parseWon(r.ms[i]) || 0; return t ? C.formatWon(t) : ''; }; }
+      function build(h) {
+        var head = [{ t: '항  목', ch: BOLD }], months = [];
+        for (var m = h * 6 + 1; m <= h * 6 + 6; m++) { head.push({ t: m + '월', ch: BOLD }); months.push(m - 1); }
+        head.push({ t: h === 0 ? '상반기 합계' : '하반기 합계', ch: BOLD });
+        if (h === 1) head.push({ t: '연간 합계', ch: BOLD });
+        var rows = [head];
+        data.forEach(function (r) {
+          var ch = r.kind ? BOLD : S, row = [{ t: r.name, ch: r.kind ? BOLD : 9 }];
+          months.forEach(function (i) { row.push({ t: r.ms[i], al: 'R', ch: ch }); });
+          row.push({ t: half(h)(r), al: 'R', ch: ch });
+          if (h === 1) row.push({ t: r.tot, al: 'R', ch: r.kind === 'ref' ? ch : 16 });
+          rows.push(row);
+        });
+        return h === 0 ? tableXml(rows, [9000, 5500, 5500, 5500, 5500, 5500, 5500, 8000], 1500, 300)
+                       : tableXml(rows, [8000, 5000, 5000, 5000, 5000, 5000, 5000, 6000, 6000], 1500, 250);
+      }
+      var title = '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="11"><hp:t>' + xe('●' + Y + '년 지출 항목별 연간 합계') + '</hp:t></hp:run></hp:p>';
+      return title + paraXml('', 9, 'C') + paraXml('(1월 ~ 6월)', 9, 'L') + build(0) + paraXml('', 9, 'C') + paraXml('(7월 ~ 12월)', 9, 'L') + build(1);
+    }
+    // 지출내역서 다음, 「수입. 지출」 앞에 새 쪽으로 넣음 (못 찾으면 맨 끝)
+    function insertItems(doc, Y) {
+      var sec = doc.documentElement;
+      var frag = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '">' + itemsXml(Y) + '</root>', 'application/xml');
+      if (frag.getElementsByTagName('parsererror').length) throw new Error('항목별 합계 변환 오류');
+      var ref = null;
+      kids(sec, 'p').some(function (p) {
+        var t = Array.prototype.filter.call(p.getElementsByTagNameNS(HP, 't'), function (x) {
+          for (var n = x.parentNode; n && n !== p; n = n.parentNode) if (n.localName === 'tbl') return false;
+          return true;
+        }).map(function (x) { return x.textContent; }).join('');
+        if (/수입\.\s*지출/.test(t)) { ref = p; return true; }
+        return false;
+      });
+      Array.prototype.slice.call(frag.documentElement.childNodes).forEach(function (n) { sec.insertBefore(doc.importNode(n, true), ref); });
+      if (ref) ref.setAttribute('pageBreak', '1');
+    }
+
     function insertReport(doc) {
       var sec = doc.documentElement;
       var frag = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '">' + reportXml() + '</root>', 'application/xml');
@@ -2604,6 +2670,7 @@ body{
         var doc = new DOMParser().parseFromString(new TextDecoder().decode(sf.data), 'application/xml');
         if (doc.getElementsByTagName('parsererror').length) throw new Error('양식 파일을 읽을 수 없습니다');
         fillLedger(doc, Y);
+        insertItems(doc, Y);
         if ($('hxReport').checked) insertReport(doc);
         var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + new XMLSerializer().serializeToString(doc).replace(/^<\?xml[^>]*\?>\s*/, '');
         sf.data = new TextEncoder().encode(xml);
