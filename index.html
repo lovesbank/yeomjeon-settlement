@@ -1065,7 +1065,6 @@ body{
         <a href="#sec-items">항목별합계</a>
         <a href="#sec-summary">수입·지출</a>
         <a href="#sec-chart">그래프</a>
-        <a href="#sec-fs">재무제표</a>
         <a href="#sec-accounts">통장잔액</a>
         <a href="#sec-receipt">영수증</a>
       </nav>
@@ -1143,11 +1142,6 @@ body{
         <div class="table-wrap"><table class="grid chart-tbl" id="chartTable"></table></div>
       </section>
 
-      <!-- ③-2 ● YYYY년 실질 재무제표 (통장 기준, 자동) -->
-      <section id="sec-fs" class="lsheet no-print">
-        <div class="title-box">●<span class="y"></span>년 실질 재무제표 (통장 기준)</div>
-        <div id="fsBox"></div>
-      </section>
 
       <!-- ④ ● (YYYY-1)년 12월31일 현재통장 잔액 -->
       <section id="sec-accounts" class="lsheet">
@@ -2095,7 +2089,6 @@ body{
       else { chk.className = 'check warn no-print'; chk.textContent = '⚠ 통장 잔액 합계와 ' + what + ' ' + C.formatWon(expect) + '원이 ' + C.formatWon(v['acc-t'] - expect) + '원 차이 납니다.'; }
       renderItems();
       renderChart();
-      renderFS();
       renderOfficial();
       renderCover();
     }
