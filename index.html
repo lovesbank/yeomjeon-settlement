@@ -591,6 +591,34 @@ body{
   #ledger .expense col.e-a{ width:15%; }
   #ledger .page-break{ height:28px; }
 
+  /* 지출 항목별 연간 합계 */
+  #ledger .items-desc{ margin:-10px 0 14px; font-size:14px; color:#444; line-height:1.55; text-align:center; }
+  #ledger table.items{ font-size:13px; }
+  #ledger .items col.i-n{ width:13%; }
+  #ledger .items col.i-t{ width:10.5%; }
+  #ledger .items td.num{ font-size:11.5px; letter-spacing:-0.5px; padding:0; white-space:nowrap; }
+  #ledger .items td.num.tot{ padding:0 3px; }
+  #ledger .items td.num.tot{ font-size:13px; letter-spacing:-0.3px; }
+  #ledger .items th{ background:#eef1fa; font-weight:700; }
+  #ledger .items td.grp{ padding:3px 4px; line-height:1.25; }
+  #ledger .items td.grp b{ display:block; font-size:14px; }
+  #ledger .items input.imoney{ text-align:right; padding:2px 1px; min-height:22px; font-variant-numeric:tabular-nums; letter-spacing:-0.5px; }
+  #ledger .items tr.spare td{ background:#fafbfd; }
+  #ledger .items tr.spare input.iname{ font-size:13px; padding:2px 2px; min-height:22px; }
+  #ledger .items tr.spare input.imoney{ background:#fff; }
+  #ledger .items tr.etc td{ background:#f7f7f2; }
+  #ledger .items td.grp small{ display:block; color:#667085; font-size:11px; margin-top:2px; }
+  #ledger .items td.num{ font-variant-numeric:tabular-nums; }
+  #ledger .items td.tot{ font-weight:700; color:var(--lg-red); }
+  #ledger .items td.empty{ color:#c0c4cc; }
+  #ledger .items tr.sum td{ font-weight:700; background:#f6f7fb; height:30px; }
+  #ledger .items tr.sum td.lbl{ text-align:center; }
+  #ledger .items tr.ref td{ background:#f2f8f4; color:#155e35; font-size:11px; height:28px; }
+  #ledger .items tr.ref td.lbl{ text-align:center; font-weight:700; line-height:1.2; }
+  #ledger .items tr.ref td.num.ok{ background:#dff3e6; }
+  #ledger .items td.num input.imoney{ margin:0; width:100%; }
+  #ledger .items td.num.bad{ background:#fde8e6 !important; color:#b42318 !important; }
+
   #ledger table.sumtbl{ font-size:20px; border:2px solid #111; }
   #ledger .sumtbl th, #ledger .sumtbl td{ height:42px; border:2px solid #111; }
   #ledger .sumtbl tr.head th{
@@ -968,6 +996,7 @@ body{
       <nav class="jump">
         <a href="#sec-revenue">매출액</a>
         <a href="#sec-expense">지출내역서</a>
+        <a href="#sec-items">항목별합계</a>
         <a href="#sec-summary">수입·지출</a>
         <a href="#sec-accounts">통장잔액</a>
         <a href="#sec-receipt">영수증</a>
@@ -992,6 +1021,16 @@ body{
         <div class="table-wrap"><table class="grid expense" id="expenseTable1"></table></div>
         <div class="page-break"></div>
         <div class="table-wrap"><table class="grid expense" id="expenseTable2"></table></div>
+      </section>
+
+      <!-- ②-1 ● YYYY년 지출 항목별 연간 합계 (이름이 조금 달라도 비슷한 항목끼리 묶음) -->
+      <section id="sec-items" class="lsheet no-print">
+        <div class="title-box">●<span class="y"></span>년 지출 항목별 연간 합계</div>
+        <p class="items-desc">지출내역서의 항목 이름이 달마다 조금 달라도(예: 「대표및아사회수당」·「대표,감사」·「대표및이사회수당」) 비슷한 이름끼리 묶어 합계를 냅니다.
+          결산 보고서를 장부에 기입하면 이 표도 자동으로 바뀝니다. 묶음 아래 작은 글씨는 실제로 묶인 이름이고, 한 해에 한 번만 나온 항목은 맨 아래 「기타」로 모읍니다.
+          「기타」 아래 빈 줄 3칸에는 항목 이름과 금액을 직접 쓸 수 있고, 줄 합계·월 합계·연간 합계가 자동으로 계산됩니다.</p>
+        <div class="table-wrap"><table class="grid items" id="itemsTable"></table></div>
+        <p class="check" id="itemsCheck"></p>
       </section>
 
       <!-- ③ ● YYYY년도 수입. 지출 -->
@@ -1051,6 +1090,13 @@ body{
       wrap.style.marginBottom = (-(wrap.offsetHeight * (1 - scale))).toFixed(1) + 'px';
     }
     window.addEventListener('resize', fit, {passive:true});
+    window.addEventListener('orientationchange', fit);
+    window.addEventListener('load', fit);
+    window.addEventListener('pageshow', fit);
+    // ✅ 아이폰: 보고서 내용(저장된 값·글꼴)이 나중에 채워져 높이가 바뀌어도 아래 빈 공간이 생기지 않게 다시 맞춤
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(wrap);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+    setTimeout(fit, 300); setTimeout(fit, 1200);
     fit();
   })();
 
@@ -1537,66 +1583,8 @@ body{
              emptyYear: emptyYear, createYear: createYear, ensureThroughYear: ensureThroughYear, balanceThrough: balanceThrough };
   })();
 
-  /* ===== 초기 자료 (한글 원본 문서에서 추출) ===== */
-  window.SEED = (function () {
-    // 2025년도 수입. 지출 — 원본 표에는 월 합계만 있음
-    var INC25 = [21168715,26238510,25675888,31694942,49765375,36551575,36244448,42132734,49847119,26913220,24846394,21904788];
-    var EXP25 = [28721550,19450980,16497930,36071840,56328410,40736810,33732430,33483130,41821120,36621750,12074030,37348420];
-    // 2026년 SMP.REC 매출액 — 월별 [[SMP 차수, 입금액]...], [[REC 차수, 입금액]...]
-    var REV26 = [
-      [[["1차",7078420],["2차",4798790],["3차",3574750],["4차",2223350]],[["1차",8421435],["2차",null],["결산이자",540]]],
-      [[["1차",5192510],["2차",5607450],["3차",5068500],["4차",3290980]],[["kt",null],["전력예측",1464742],["결산이자",249]]],
-      [[["1차",8210679],["2차",5799050],["3차",7440970],["4차",1351480]],[["kt",null],["2차",null],["결산이자",676]]],
-      [[["1차",8166680],["2차",9762460],["3차",9645800],["4차",3433280]],[["1차",5262180],["2차",null],["결산이자",842]]],
-      [[["1차",8948580],["2차",8984950],["3차",10104700],["4차",3798930]],[["kt",null],["rec",null],["결산이자",91]]],
-      [[["1차",11227690],["2차",14453200],["3차",6603710],["4차",4808620]],[["1차",null],["이자",1024],["결산이자",3282]]],
-      [[["1차",null],["2차",null],["3차",null],["4차",null]],[["1차",null],["2차",null],["결산이자",null]]],
-      [[["1차",null],["2차",null],["3차",null],["4차",null]],[["kt",null],["2차",null],["결산이자",null]]],
-      [[["1차",null],["2차",null],["3차",null],["4차",null]],[["kt전력예측",null],["2차",null],["결산이자",null]]],
-      [[["1차",null],["2차",null],["3차",null],["4차",null]],[["김광복세무",null],["2차",null],["결산이자",null]]],
-      [[["1차",null],["2차",null],["3차",null],["4차",null]],[["1차",null],["2차",null],["결산이자",null]]],
-      [[["1차",null],["2차",null],["3차",null],["4차",null]],[["1차",null],["이자",null],["결산이자",null]]]
-    ];
-    // 2026년 지출내역서 — 월별 [내역, 금액]
-    var EXP26 = [
-      [["이음북스",31000],["명정상품권",4700000],["사람과사람세무사",154000],["보상금",7000500],["대표및아사회수당",1000000],["스캐너",468768],["송전료",353260],["이사회식사",164000],["부가세",9227740],["이사회식사",65000]],
-      [["송전료",310760],["상품권추가",850000],["사람과사람세무사",154000],["보상금",17500500],["대표및아사회수당",400000],["복음문화사",166000],["고향집",830000]],
-      [["은행수수료,증명수수료",500],["차입금상환",7000500],["사람과사람세무사",154000],["법인세",9952890],["대표",400000],["정정국,김정배",200000],["송전료",433980],["법인세조정료",2521000],["운영비",11000500],["유병춘법무사",427240]],
-      [["송전료",393730],["차입금상환",7000500],["사람과사람세무사",154000],["보상금",17500500],["대표,감사",500000],["부가세",9280120],["소득세주민세",610210],["이사회식대",90000]],
-      [["송전료",343250],["차입금상환",7000000],["사람과사람세무사",154000],["보상금",14000000],["대표,감사",500000],["보험료",10773174],["수수료",1500],["노인회",1000000]],
-      [["송전료",316370],["공인인증수수료",110000],["사람과사람",154000],["토너구입비",93251],["대표,감사수당",500000],["운영비",11000500],["토지임대료",14300500],["대한그린에너지",7000500],["대한그린식사",120000]],
-      [["부가세",null],["차입금상환",null],["사람과사람세무사",null],["보상금",null],["대표및이사회수당",null],["송전료",null],["이사회식대",null],["수수료",null]],
-      [["중간법인세",null],["차입금상환",null],["사람과사람세무사",null],["보상금",null],["대표및이사회수당",null],["송전료",null],["이사회식대",null],["주민세+수수료500",null],["군청",null],["마을찬조",null]],
-      [["운영비",null],["차입금상환",null],["사람과사람세무사",null],["보상금",null],["대표및이사회수당",null],["송전료",null],["이사회식대",null],["상품권",null],["군청조화",null],["마을찬조",null]],
-      [["부가세",null],["차입금상환",null],["사람과사람세무사",null],["보상금",null],["대표및이사회수당",null],["송전료",null]],
-      [["송전료",null],["이사회 식대",null],["사람과사람세무사",null],["보상금",null],["대표및이사회수당",null]],
-      [["송전료",null],["이사회 식대",null],["사람과사람세무사",null],["보상금",null],["대표및이사회수당",null],["군청근조화환",null],["이음북스",null],["토지임대료",null],["운영비",null]]
-    ];
-    // 2025년 12월31일 현재통장 잔액 — [구분, 잔액, 계좌]
-    var ACC = [["기업은행",7640930,"546-******-01-***"],["농협(주주피해보상금)",2470013,"351-****-1167-**"]];
-
-    function rows(n, list, make) { var o = list.map(make); while (o.length < n) o.push(make(['', null])); return o; }
-    var y25 = { carryover: 10015635, carryoverAuto: false, notes: {}, revenue: {}, expense: {},
-                accounts: ACC.map(function (a) { return { name: a[0], balance: null, account: a[2] }; }),
-                receipt: '은행거래내역서  잔액증명서첨부' };
-    var y26 = { carryover: 10110943, carryoverAuto: true, notes: {}, revenue: {}, expense: {},
-                accounts: ACC.map(function (a) { return { name: a[0], balance: a[1], account: a[2] }; }),
-                receipt: '은행거래내역서  잔액증명서첨부' };
-    for (var m = 1; m <= 12; m++) {
-      var n = [10, 11, 10][(m - 1) % 3];
-      y25.revenue[m] = {
-        smp: [{ label: '월합계', amount: INC25[m - 1], memo: '원본표 월합계(SMP+REC)' }, { label: '2차', amount: null, memo: '' }, { label: '3차', amount: null, memo: '' }, { label: '4차', amount: null, memo: '' }],
-        rec: [{ label: '1차', amount: null, memo: '' }, { label: '2차', amount: null, memo: '' }, { label: '결산이자', amount: null, memo: '' }]
-      };
-      y25.expense[m] = rows(n, [['월 지출 합계(원본표)', EXP25[m - 1]]], function (r) { return { date: '', item: r[0], amount: r[1] }; });
-      y26.revenue[m] = {
-        smp: REV26[m - 1][0].map(function (r) { return { label: r[0], amount: r[1], memo: '' }; }),
-        rec: REV26[m - 1][1].map(function (r) { return { label: r[0], amount: r[1], memo: '' }; })
-      };
-      y26.expense[m] = rows(n, EXP26[m - 1], function (r) { return { date: '', item: r[0], amount: r[1] }; });
-    }
-    return { version: 2, years: { 2025: y25, 2026: y26 } };
-  })();
+  /* ===== 기본 자료 (2026-11-03 백업 파일 기준) ===== */
+  window.SEED = {"version":2,"years":{"2025":{"carryover":10015635,"carryoverAuto":false,"notes":{},"revenue":{"1":{"smp":[{"label":"월합계","amount":21168715,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"2":{"smp":[{"label":"월합계","amount":26238510,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"3":{"smp":[{"label":"월합계","amount":25675888,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"4":{"smp":[{"label":"월합계","amount":31694942,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"5":{"smp":[{"label":"월합계","amount":49765375,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"6":{"smp":[{"label":"월합계","amount":36551575,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"7":{"smp":[{"label":"월합계","amount":36244448,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"8":{"smp":[{"label":"월합계","amount":42132734,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"9":{"smp":[{"label":"월합계","amount":49847119,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"10":{"smp":[{"label":"월합계","amount":26913220,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"11":{"smp":[{"label":"월합계","amount":24846394,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"12":{"smp":[{"label":"월합계","amount":21904788,"memo":"원본표 월합계(SMP+REC)"},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]}},"expense":{"1":[{"date":"","item":"월 지출 합계(원본표)","amount":28721550},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"2":[{"date":"","item":"월 지출 합계(원본표)","amount":19450980},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"3":[{"date":"","item":"월 지출 합계(원본표)","amount":16497930},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"4":[{"date":"","item":"월 지출 합계(원본표)","amount":36071840},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"5":[{"date":"","item":"월 지출 합계(원본표)","amount":56328410},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"6":[{"date":"","item":"월 지출 합계(원본표)","amount":40736810},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"7":[{"date":"","item":"월 지출 합계(원본표)","amount":33732430},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"8":[{"date":"","item":"월 지출 합계(원본표)","amount":33483130},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"9":[{"date":"","item":"월 지출 합계(원본표)","amount":41821120},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"10":[{"date":"","item":"월 지출 합계(원본표)","amount":36621750},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"11":[{"date":"","item":"월 지출 합계(원본표)","amount":12074030},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"12":[{"date":"","item":"월 지출 합계(원본표)","amount":37348420},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}]},"accounts":[{"name":"기업은행","balance":null,"account":"546-******-01-***"},{"name":"농협(주주피해보상금)","balance":null,"account":"351-****-1167-**"}],"receipt":"은행거래내역서  잔액증명서첨부"},"2026":{"carryover":10110943,"carryoverAuto":true,"notes":{},"revenue":{"1":{"smp":[{"label":"1차","amount":7078420,"memo":""},{"label":"2차","amount":4798790,"memo":""},{"label":"3차","amount":3574750,"memo":""},{"label":"4차","amount":2223350,"memo":""}],"rec":[{"label":"1차","amount":8421435,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":540,"memo":""}]},"2":{"smp":[{"label":"1차","amount":5192510,"memo":""},{"label":"2차","amount":5607450,"memo":""},{"label":"3차","amount":5068500,"memo":""},{"label":"4차","amount":3290980,"memo":""}],"rec":[{"label":"kt","amount":null,"memo":""},{"label":"전력예측","amount":1464742,"memo":""},{"label":"결산이자","amount":249,"memo":""}]},"3":{"smp":[{"label":"1차","amount":8210679,"memo":""},{"label":"2차","amount":5799050,"memo":""},{"label":"3차","amount":7440970,"memo":""},{"label":"4차","amount":1351480,"memo":""}],"rec":[{"label":"kt","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":676,"memo":""}]},"4":{"smp":[{"label":"1차","amount":8166680,"memo":""},{"label":"2차","amount":9762460,"memo":""},{"label":"3차","amount":9645800,"memo":""},{"label":"4차","amount":3433280,"memo":""}],"rec":[{"label":"1차","amount":5262180,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":842,"memo":""}]},"5":{"smp":[{"label":"1차","amount":8948580,"memo":""},{"label":"2차","amount":8984950,"memo":""},{"label":"3차","amount":10104700,"memo":""},{"label":"4차","amount":3798930,"memo":""}],"rec":[{"label":"kt","amount":null,"memo":""},{"label":"rec","amount":null,"memo":""},{"label":"결산이자","amount":91,"memo":""}]},"6":{"smp":[{"label":"1차","amount":11227690,"memo":""},{"label":"2차","amount":14453200,"memo":""},{"label":"3차","amount":6603710,"memo":""},{"label":"4차","amount":4808620,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"이자","amount":1024,"memo":""},{"label":"결산이자","amount":3282,"memo":""}]},"7":{"smp":[{"label":"1차","amount":11346760,"memo":""},{"label":"2차","amount":11924220,"memo":""},{"label":"3차","amount":7633000,"memo":""},{"label":"4차","amount":3725680,"memo":""}],"rec":[{"label":"Kt","amount":1613230,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":861,"memo":""}]},"8":{"smp":[{"label":"1차","amount":7502600,"memo":""},{"label":"2차","amount":11171100,"memo":""},{"label":"3차","amount":13008990,"memo":""},{"label":"4차","amount":7098910,"memo":""}],"rec":[{"label":"kt","amount":2152047,"memo":""},{"label":"rec","amount":2657270,"memo":""},{"label":"결산이자","amount":427,"memo":""}]},"9":{"smp":[{"label":"1차","amount":16893180,"memo":""},{"label":"2차","amount":13556300,"memo":""},{"label":"3차","amount":14071590,"memo":""},{"label":"4차","amount":4131220,"memo":""}],"rec":[{"label":"kt전력예측","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":803,"memo":""}]},"10":{"smp":[{"label":"1차","amount":15226350,"memo":""},{"label":"2차","amount":10660620,"memo":""},{"label":"3차","amount":7084580,"memo":""},{"label":"4차","amount":2925340,"memo":""}],"rec":[{"label":"김광복세무","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":1127,"memo":""}]},"11":{"smp":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]},"12":{"smp":[{"label":"1차","amount":null,"memo":""},{"label":"2차","amount":null,"memo":""},{"label":"3차","amount":null,"memo":""},{"label":"4차","amount":null,"memo":""}],"rec":[{"label":"1차","amount":null,"memo":""},{"label":"이자","amount":null,"memo":""},{"label":"결산이자","amount":null,"memo":""}]}},"expense":{"1":[{"date":"","item":"이음북스","amount":31000},{"date":"","item":"명정상품권","amount":4700000},{"date":"","item":"사람과사람세무사","amount":154000},{"date":"","item":"보상금","amount":7000500},{"date":"","item":"대표및아사회수당","amount":1000000},{"date":"","item":"스캐너","amount":468768},{"date":"","item":"송전료","amount":353260},{"date":"","item":"이사회식사","amount":164000},{"date":"","item":"부가세","amount":9227740},{"date":"","item":"이사회식사","amount":65000}],"2":[{"date":"","item":"송전료","amount":310760},{"date":"","item":"상품권추가","amount":850000},{"date":"","item":"사람과사람세무사","amount":154000},{"date":"","item":"보상금","amount":17500500},{"date":"","item":"대표및아사회수당","amount":400000},{"date":"","item":"복음문화사","amount":166000},{"date":"","item":"고향집","amount":830000},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"3":[{"date":"","item":"은행수수료,증명수수료","amount":500},{"date":"","item":"차입금상환","amount":7000500},{"date":"","item":"사람과사람세무사","amount":154000},{"date":"","item":"법인세","amount":9952890},{"date":"","item":"대표","amount":400000},{"date":"","item":"정정국,김정배","amount":200000},{"date":"","item":"송전료","amount":433980},{"date":"","item":"법인세조정료","amount":2521000},{"date":"","item":"운영비","amount":11000500},{"date":"","item":"유병춘법무사","amount":427240}],"4":[{"date":"","item":"송전료","amount":393730},{"date":"","item":"차입금상환","amount":7000500},{"date":"","item":"사람과사람세무사","amount":154000},{"date":"","item":"보상금","amount":17500500},{"date":"","item":"대표,감사","amount":500000},{"date":"","item":"부가세","amount":9280120},{"date":"","item":"소득세주민세","amount":610210},{"date":"","item":"이사회식대","amount":90000},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"5":[{"date":"","item":"송전료","amount":343250},{"date":"","item":"차입금상환","amount":7000000},{"date":"","item":"사람과사람세무사","amount":154000},{"date":"","item":"보상금","amount":14000000},{"date":"","item":"대표,감사","amount":500000},{"date":"","item":"보험료","amount":10773174},{"date":"","item":"수수료","amount":1500},{"date":"","item":"노인회","amount":1000000},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"6":[{"date":"","item":"송전료","amount":316370},{"date":"","item":"공인인증수수료","amount":110000},{"date":"","item":"사람과사람","amount":154000},{"date":"","item":"토너구입비","amount":93251},{"date":"","item":"대표,감사수당","amount":500000},{"date":"","item":"운영비","amount":11000500},{"date":"","item":"토지임대료","amount":14300500},{"date":"","item":"대한그린에너지","amount":7000500},{"date":"","item":"대한그린식사","amount":120000},{"date":"","item":"","amount":null}],"7":[{"date":"","item":"송전료","amount":348540},{"date":"","item":"보상금","amount":17500500},{"date":"","item":"사람과사람세무사","amount":154000},{"date":"","item":"뷰녀회찬조","amount":1500000},{"date":"","item":"대표및감사수당","amount":500000},{"date":"","item":"부가세","amount":10786620},{"date":"","item":"회관전기공사","amount":3850000},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"8":[{"date":"","item":"송전료","amount":326030},{"date":"","item":"대표감사수당","amount":500000},{"date":"","item":"사람과사람세무사","amount":154000},{"date":"","item":"보상금","amount":17500500},{"date":"","item":"중간법인세","amount":11373550},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"9":[{"date":"","item":"운영비","amount":11000500},{"date":"","item":"대표.감사수당","amount":500000},{"date":"","item":"사람과사람세무사","amount":154000},{"date":"","item":"보상금","amount":17500500},{"date":"","item":"송전료","amount":368280},{"date":"","item":"상품권","amount":5500000},{"date":"","item":"염전마을","amount":3000000},{"date":"","item":"상품권","amount":null},{"date":"","item":"군청조화","amount":null},{"date":"","item":"마을찬조","amount":null}],"10":[{"date":"","item":"송전료","amount":322040},{"date":"","item":"마을야유회","amount":3000000},{"date":"","item":"사람과사람세무사","amount":154000},{"date":"","item":"보상금","amount":17500500},{"date":"","item":"대표및이사회수당","amount":500000},{"date":"","item":"부가세","amount":13747910},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"11":[{"date":"","item":"송전료","amount":null},{"date":"","item":"이사회 식대","amount":null},{"date":"","item":"사람과사람세무사","amount":null},{"date":"","item":"보상금","amount":null},{"date":"","item":"대표및이사회수당","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null},{"date":"","item":"","amount":null}],"12":[{"date":"","item":"송전료","amount":null},{"date":"","item":"이사회 식대","amount":null},{"date":"","item":"사람과사람세무사","amount":null},{"date":"","item":"보상금","amount":null},{"date":"","item":"대표및이사회수당","amount":null},{"date":"","item":"군청근조화환","amount":null},{"date":"","item":"이음북스","amount":null},{"date":"","item":"토지임대료","amount":null},{"date":"","item":"운영비","amount":null},{"date":"","item":"","amount":null}]},"accounts":[{"name":"기업은행","balance":7640930,"account":"546-******-01-***"},{"name":"농협(주주피해보상금)","balance":2470013,"account":"351-****-1167-**"}],"receipt":"은행거래내역서  잔액증명서첨부","fromReport":{},"bank":{"10":[{"name":"기업은행","balance":15484443,"account":"546-******-01-***"},{"name":"농협(주주피해보상금)","balance":17639582,"account":"351-****-1167-**"}],"11":[{"name":"기업은행","balance":15484443,"account":"546-******-01-***"},{"name":"농협(주주피해보상금)","balance":17639582,"account":"351-****-1167-**"}]}}}};
 
   /* =========================================================
      장부 화면 + ⏎ 엔터칸
@@ -1780,6 +1768,152 @@ body{
     }
 
     /* ── 합계 다시 계산 ── */
+    /* ── 지출 항목별 연간 합계 : 비슷한 이름끼리 묶기 ── */
+    // 앞에서부터 먼저 맞는 규칙으로 묶습니다 (순서 중요: 「이사회식대」는 '수당'보다 '식대'가 먼저)
+    var ITEM_RULES = [
+      ['기타',             /(조화|근조)/],           // 군청조화·군청근조화환 등은 기타로
+      ['식대(이사회 등)',  /(식대|식사)/],
+      ['대표·이사회 수당', /(대표|이사회|아사회|감사|수당)/],
+      ['세무사·회계',      /(사람과사람|세무|조정료)/],
+      ['법무사',           /법무/],
+      ['세금',             /(부가|법인세|소득세|주민세|지방세|재산세|세금|국세|원천)/],
+      ['송전료',           /송전/],
+      ['보상금',           /보상/],
+      ['차입금 상환',      /(차입|대한그린에너지)/],
+      ['보험료',           /보험/],
+      ['토지임대료',       /(토지|임대)/],
+      ['운영비',           /운영/],
+      ['상품권',           /상품권/],
+      ['찬조',             /(찬조|노인회|염전마을)/],
+      ['수수료',           /(수수료|인증)/],
+      ['사무용품',         /(토너|스캐너|복사|용지|문구)/]
+    ];
+    var ETC = '기타';
+    // 반환: { key: 묶음 이름, rule: 규칙으로 묶였는지 }
+    function itemKey(name) {
+      var raw = String(name || '').trim(), t = raw.replace(/\s+/g, '');
+      for (var i = 0; i < ITEM_RULES.length; i++) if (ITEM_RULES[i][1].test(t)) return { key: ITEM_RULES[i][0], rule: true };
+      // 규칙에 없는 이름: 띄어쓰기·기호·숫자를 빼고 같은 이름끼리 묶음
+      var k = raw.replace(/[\s.,·+\-_()\[\]0-9]/g, '');
+      return { key: k || raw, rule: false };
+    }
+    var SPARE_N = 3;   // 직접 쓰는 예비 줄
+    function iData() { var d = yd(); if (!d.items) d.items = {}; return d.items; }
+    function iGet(path) { return getPath(iData(), path); }
+    function moneyIn(path, val, auto, extra) {
+      var ov = val !== null && val !== undefined;
+      return '<input class="imoney' + '" inputmode="numeric" data-ipath="' + esc(path) + '" data-auto="' + (auto || 0) + '"' +
+        ' value="' + (ov ? C.formatWon(val) : (auto ? C.formatWon(auto) : '')) + '"' + (extra || '') + '>';
+    }
+    // 지출내역서 → 묶음별 자동 금액
+    function itemGroups() {
+      var d = yd(), groups = {}, order = [];
+      C.MONTHS.forEach(function (m) {
+        ((d.expense && d.expense[m]) || []).forEach(function (r) {
+          var amt = Number(r && r.amount) || 0, name = r && String(r.item || '').trim();
+          if (!name && !amt) return;
+          var ik = name ? itemKey(name) : { key: ETC, rule: false }, key = ik.key;
+          var g = groups[key];
+          if (!g) { g = groups[key] = { key: key, rule: ik.rule, names: [], mn: {}, m: {}, total: 0 }; order.push(key); }
+          if (name && g.names.indexOf(name) < 0) g.names.push(name);
+          if (name) { (g.mn[m] = g.mn[m] || []); if (g.mn[m].indexOf(name) < 0) g.mn[m].push(name); }
+          g.m[m] = (g.m[m] || 0) + amt; g.total += amt;
+        });
+      });
+      // 규칙에 없는 이름 중 한 해에 한 달만 나온 항목, 그리고 「기타」 규칙 항목은 맨 아래 「기타」로 모음
+      var etc = { key: ETC, names: [], mn: {}, m: {}, total: 0 }, list = [];
+      order.forEach(function (k) {
+        var g = groups[k], months = Object.keys(g.m).filter(function (m) { return g.m[m]; }).length;
+        if (k === ETC || (!g.rule && months <= 1)) {
+          g.names.forEach(function (n) { if (etc.names.indexOf(n) < 0) etc.names.push(n); });
+          Object.keys(g.m).forEach(function (m) { etc.m[m] = (etc.m[m] || 0) + g.m[m]; });
+          Object.keys(g.mn).forEach(function (m) { etc.mn[m] = (etc.mn[m] || []).concat(g.mn[m]); });
+          etc.total += g.total;
+        } else list.push(g);
+      });
+      return { list: list, etc: etc };
+    }
+    function renderItems() {
+      var tbl = $('itemsTable'); if (!tbl) return;
+      if (tbl.contains(document.activeElement)) { updateItemSums(); return; }   // 입력 중에는 표를 다시 그리지 않음 (한글 입력 끊김 방지)
+      var G = itemGroups(), list = G.list;
+      list.sort(function (a, b) { return b.total - a.total || a.key.localeCompare(b.key, 'ko'); });
+      var h = '<colgroup><col class="i-n">' + C.MONTHS.map(function () { return '<col>'; }).join('') + '<col class="i-t"></colgroup>';
+      h += '<thead><tr><th>항목</th>' + C.MONTHS.map(function (m) { return '<th>' + m + '월</th>'; }).join('') + '<th>연간 합계</th></tr></thead><tbody>';
+      function groupRow(g, isEtc) {
+        var sub = (isEtc || g.names.length > 1 || (g.names[0] && g.names[0] !== g.key)) && g.names.length ? '<small>' + g.names.map(esc).join(' · ') + '</small>' : '';
+        var r = '<tr class="' + (isEtc ? 'etc' : '') + '"><td class="grp"><b>' + esc(g.key) + '</b>' + sub + '</td>';
+        C.MONTHS.forEach(function (m) {
+          var x = g.m[m] || 0;
+          r += '<td class="num auto" data-v="' + x + '">' + (x ? C.formatWon(x) : '') + '</td>';
+        });
+        return r + '<td class="num tot" data-itot="' + esc(g.key) + '"></td></tr>';
+      }
+      list.forEach(function (g) { h += groupRow(g, false); });
+      h += groupRow(G.etc, true);
+      for (var i = 0; i < SPARE_N; i++) {
+        h += '<tr class="spare"><td class="grp"><input class="iname" data-ipath="spare.' + i + '.name" value="' + esc(iGet('spare.' + i + '.name') || '') + '" placeholder="빈 줄 ' + (i + 1) + '"></td>';
+        C.MONTHS.forEach(function (m) { h += '<td class="num">' + moneyIn('spare.' + i + '.m.' + m, iGet('spare.' + i + '.m.' + m), 0) + '</td>'; });
+        h += '<td class="num tot" data-itot="#spare' + i + '"></td></tr>';
+      }
+      h += '<tr class="sum"><td class="lbl">합 계</td>' + C.MONTHS.map(function (m) { return '<td class="num" data-isum="' + m + '"></td>'; }).join('') +
+           '<td class="num tot" data-isum="all"></td></tr>' +
+           // 대조 줄: 지출내역서 월별 지출 총액 (위 합계와 달마다 같아야 함)
+           '<tr class="ref"><td class="lbl">지출내역서<br>월 합계</td>' + C.MONTHS.map(function (m) { return '<td class="num" data-iref="' + m + '"></td>'; }).join('') +
+           '<td class="num" data-iref="all"></td></tr></tbody>';
+      tbl.innerHTML = h;
+      updateItemSums();
+    }
+    // 화면에 보이는 칸(자동값 또는 직접 고친 값)으로 줄 합계·월 합계·연간 합계 계산
+    function updateItemSums() {
+      var tbl = $('itemsTable'); if (!tbl) return;
+      var colSum = {}, all = 0, rowSum = {};
+      tbl.querySelectorAll('td.auto, input.imoney').forEach(function (el) {
+        var v = el.tagName === 'TD' ? (Number(el.getAttribute('data-v')) || 0) : (C.parseWon(el.value) || 0);
+        var td = el.closest('td'), tr = el.closest('tr');
+        var m = Array.prototype.indexOf.call(tr.children, td);   // 1~12
+        var key = tr.querySelector('[data-itot]').getAttribute('data-itot');
+        colSum[m] = (colSum[m] || 0) + v; rowSum[key] = (rowSum[key] || 0) + v; all += v;
+      });
+      tbl.querySelectorAll('[data-itot]').forEach(function (el) { var x = rowSum[el.getAttribute('data-itot')] || 0; el.textContent = x ? C.formatWon(x) : ''; });
+      tbl.querySelectorAll('[data-isum]').forEach(function (el) { var k = el.getAttribute('data-isum'), x = k === 'all' ? all : (colSum[k] || 0); el.textContent = x ? C.formatWon(x) : (k === 'all' ? '0' : ''); });
+      var d = yd(), bad = [];
+      tbl.querySelectorAll('[data-iref]').forEach(function (el) {
+        var k = el.getAttribute('data-iref'), ref = k === 'all' ? C.MONTHS.reduce(function (a, m) { return a + C.expenseMonth(d, m); }, 0) : C.expenseMonth(d, Number(k));
+        var mine = k === 'all' ? all : (colSum[k] || 0), ok = ref === mine;
+        el.textContent = ref ? C.formatWon(ref) : (k === 'all' ? '0' : '');
+        el.classList.toggle('ok', ok && !!ref); el.classList.toggle('bad', !ok);
+        var top = tbl.querySelector('[data-isum="' + k + '"]'); if (top) top.classList.toggle('bad', !ok);
+        if (!ok && k !== 'all') bad.push(k + '월 ' + C.formatWon(mine - ref) + '원');
+      });
+      var te = C.summarize(db, year).totalExpense, chk = $('itemsCheck');
+      if (bad.length) { chk.className = 'check warn'; chk.textContent = '⚠ 지출내역서 월 합계와 다른 달: ' + bad.join(', ') + ' 차이 (빈 줄에 직접 쓴 금액 때문입니다)'; }
+      else if (all === te) { chk.className = 'check ok'; chk.textContent = '✔ 매월 항목별 합계가 지출내역서 월 합계와 모두 같고, 연간 ' + C.formatWon(all) + '원도 지출 총계와 일치합니다.'; }
+      else { chk.className = 'check warn'; chk.textContent = '⚠ 항목별 합계가 지출 총계(' + C.formatWon(te) + '원)와 ' + C.formatWon(all - te) + '원 차이 납니다. (빈 줄에 직접 쓴 금액 때문입니다)'; }
+    }
+    (function () {
+      var tbl = $('itemsTable'); if (!tbl) return;
+      tbl.addEventListener('input', function (e) {
+        var el = e.target, path = el.getAttribute('data-ipath'); if (!path) return;
+        if (el.classList.contains('imoney')) {
+          var c = el.value.replace(/[^\d,\-]/g, ''); if (c !== el.value) el.value = c;
+          var v = C.parseWon(c);
+          // 칸을 비우면 자동값으로 돌아감 (예비 줄은 빈칸)
+          setPath(iData(), path, v);
+        } else setPath(iData(), path, el.value);
+        updateItemSums();
+        saveSoon();
+      });
+      tbl.addEventListener('focusout', function (e) {
+        var el = e.target;
+        if (el.classList && el.classList.contains('imoney')) {
+          var v = getPath(iData(), el.getAttribute('data-ipath')), auto = Number(el.getAttribute('data-auto')) || 0;
+          el.value = (v !== null && v !== undefined) ? C.formatWon(v) : (auto ? C.formatWon(auto) : '');
+        }
+        setTimeout(function () { if (!tbl.contains(document.activeElement)) renderItems(); }, 0);
+      });
+    })();
+
     function updateTotals() {
       var d = yd(), s = C.summarize(db, year);
       var v = { 'rev-t': C.revenueTotal(d), carry: s.carryover, diff: s.diff, bal: s.balance,
@@ -1805,6 +1939,7 @@ body{
       if (!hasBal(rows)) { chk.className = 'check no-print'; chk.textContent = '계좌 잔액을 입력하면 ' + what + ' ' + C.formatWon(expect) + '원과 맞는지 확인합니다.'; }
       else if (v['acc-t'] === expect) { chk.className = 'check ok no-print'; chk.textContent = '✔ 통장 잔액 합계가 ' + what + '과 일치합니다.'; }
       else { chk.className = 'check warn no-print'; chk.textContent = '⚠ 통장 잔액 합계와 ' + what + ' ' + C.formatWon(expect) + '원이 ' + C.formatWon(v['acc-t'] - expect) + '원 차이 납니다.'; }
+      renderItems();
     }
 
     function renderAll() {
@@ -2526,6 +2661,11 @@ body{
     syncReportHeads(true);
     preview();
     fitLedger();
+    window.addEventListener('orientationchange', fitLedger);
+    window.addEventListener('load', fitLedger);
+    window.addEventListener('pageshow', fitLedger);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitLedger);
+    setTimeout(fitLedger, 300); setTimeout(fitLedger, 1200);
   })();
 </script>
 </body>
