@@ -642,11 +642,14 @@ body{
   /* 결산 앞장 */
   #ledger .cv-title{ text-align:center; font-size:30px; font-weight:900; color:#143a63; margin:4px 0 22px; letter-spacing:1px; }
   #ledger .cv-h{ font-size:19px; font-weight:800; margin:22px 0 8px; }
-  #ledger .cv-purpose{ display:block; width:100%; font:inherit; font-size:16px; line-height:1.6; padding:8px 10px; border:1px solid var(--lg-btn-line); border-radius:4px; resize:vertical; }
-  #ledger table.cv-tbl{ font-size:16px; max-width:820px; margin:0 auto; }
+  #ledger .cv-pl{ font-size:17px; font-weight:700; margin:6px 0 2px; }
+  #ledger #coverBox{ font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif; }
+  #ledger .cv-purpose{ display:block; width:100%; font:inherit; font-size:17px; line-height:1.6; padding:8px 10px; border:1px solid var(--lg-btn-line); border-radius:4px; resize:vertical; }
+  #ledger table.cv-tbl{ font-size:17px; max-width:820px; margin:0 auto; }
+  #ledger .cv-tbl th, #ledger .cv-tbl tr td:first-child{ background:linear-gradient(90deg,#ffffff,#c0cdef) !important; color:#003366; font-weight:700; }
   #ledger .cv-tbl th{ background:#f2f2f2; font-weight:700; height:32px; }
   #ledger .cv-tbl td{ height:32px; }
-  #ledger .cv-line{ font-size:16px; margin:4px 0 4px 10px; }
+  #ledger .cv-line{ font-size:17px; margin:4px 0 4px 10px; }
   #ledger .cv-del{ width:26px; height:24px; padding:0; border:1px solid #e4a3a0; background:#fff5f4; color:#b42318; border-radius:4px; cursor:pointer; }
   #ledger .cv-add{ display:block; margin:8px auto 0; font:inherit; font-size:15px; padding:6px 14px; border:1px solid #1d2b5c; background:#fff; color:#1d2b5c; border-radius:6px; cursor:pointer; }
 
@@ -2945,7 +2948,7 @@ body{
       });
       var widths = [6200]; C.MONTHS.forEach(function () { widths.push(3450); }); widths.push(4800);
       var title = '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="11"><hp:t>' + xe('●' + Y + '년 지출 항목별 연간 합계') + '</hp:t></hp:run></hp:p>';
-      return title + paraXml('', 9, 'C') + tableXml(rows, widths, 2000, 60);   // 줄 높이 넉넉하게
+      return title + paraXml('', 9, 'C') + tableXml(rows, widths, 1650, 60);   // 줄 높이 (수입·지출과 한 장에 들어가게 약간 줄임)
     }
     // 지출내역서 다음, 「수입. 지출」 앞에 새 쪽으로 넣음 (못 찾으면 맨 끝)
     function insertItems(doc, Y, smallCh) {
@@ -3151,7 +3154,7 @@ body{
       var O = fsOfficial(Y); if (!O) return '';
       var BOLD = 10, N = 9, S = 12, out = '';
       // 재무상태표는 한 장, 손익계산서와 이익잉여금처분계산서는 A4 한 장에 이어서 (새 쪽 안 넘김)
-      [['재 무 상 태 표', O.bsHead, O.bs, 1, O.nbs], ['손 익 계 산 서', O.plHead, O.pl, 1, O.npl], ['이익잉여금처분계산서', O.plHead, O.re, 0, O.nre]].forEach(function (T) {
+      [['재 무 상 태 표', O.bsHead, O.bs, 1, O.nbs], ['손 익 계 산 서', O.plHead, O.pl, 1, O.npl], ['이익잉여금처분계산서', O.plHead, O.re, 1, O.nre]].forEach(function (T) {
         if (!T[3]) out += paraXml('', N, 'C');
         out += '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="' + T[3] + '" columnBreak="0" merged="0"><hp:run charPrIDRef="29"><hp:t>' + xe(T[0]) + '</hp:t></hp:run></hp:p>';
         T[1].filter(Boolean).forEach(function (x) { out += paraXml(x, N, 'C'); });
@@ -3164,10 +3167,12 @@ body{
           var lab = x[5] ? NAVY : N, num = key ? RED : (x[5] ? NAVY : N), bf = key ? HEAD : 4;
           rows.push([{ t: new Array(x[6] * 2 + 1).join(' ') + x[0], al: 'L', ch: lab, bf: bf }, { t: x[1], al: 'R', ch: S, bf: bf }, { t: x[2], al: 'R', ch: num, bf: bf }, { t: x[3], al: 'R', ch: S, bf: bf }, { t: x[4], al: 'R', ch: num, bf: bf }]);
         });
-        out += tableXml(rows, [16000, 8500, 9000, 8000, 8500], 1250);
+        var isRE = T[2] === O.re;   // 이익잉여금처분계산서는 혼자 한 장 → 줄을 늘려 A4를 채움
+        out += tableXml(rows, [16000, 8500, 9000, 8000, 8500], isRE ? 2800 : 1250);
         out += paraXml(FS_NOTE, S, 'L');
         // 주민 설명란 (표 아래 상자 한 칸에)
-        out += tableXml([[{ t: '■ 주민 설명', al: 'L', ch: NAVY, bf: HEAD }]].concat(T[4].map(function (x) { return [{ t: '· ' + x, al: 'L', ch: N }]; })), [50000], 1500);
+        var NC = isRE ? 39 : N;   // 이익잉여금 설명은 13pt
+        out += tableXml([[{ t: '■ 주민 설명', al: 'L', ch: isRE ? 11 : NAVY, bf: HEAD }]].concat(T[4].map(function (x) { return [{ t: '· ' + x, al: 'L', ch: NC }]; })), [50000], isRE ? 2400 : 1500);
       });
       return out;
     }
@@ -3182,15 +3187,21 @@ body{
         ['이  사', '정병환', '백수읍 백수로205-24'], ['이  사', '정선만', '백수읍 백수로205-24'], ['이  사', '박균환', '백수읍 백수로2길28-9'],
         ['감  사', '정정국', '백수읍 백수로230-9']
       ],
+      purpose2: '본회사는 태양광 발전사업으로 얻은 이익을 마을 주민들에게 고르게 나누어 주민들의 실질 소득 향상에 기여하고, 이를 통해 주민들 사이에 가족 같은 유대감을 키우며 마을의 화합을 이루는 것을 주된 목표로 한다',
       shares: 400, parValue: 1000
     };
-    function cover() { if (!db.cover) db.cover = JSON.parse(JSON.stringify(COVER_DEFAULT)); return db.cover; }
+    function cover() {
+      if (!db.cover) db.cover = JSON.parse(JSON.stringify(COVER_DEFAULT));
+      if (db.cover.purpose2 == null) db.cover.purpose2 = COVER_DEFAULT.purpose2;   // 예전에 저장된 자료에도 목적 ② 추가
+      return db.cover;
+    }
     function renderCover() {
       var box = $('coverBox'); if (!box) return;
       if (box.contains(document.activeElement)) return;   // 입력 중에는 다시 그리지 않음
       var c = cover(), amt = c.shares * c.parValue;
       var h = '<div class="cv-title">&lt; ' + year + '년도 결산 보고서 &gt;</div>' +
-        '<div class="cv-h">1) 회사의 목적</div><textarea class="cv-purpose" id="cvPurpose" rows="4">' + esc(c.purpose) + '</textarea>' +
+        '<div class="cv-h">1) 회사의 목적</div><div class="cv-pl">①</div><textarea class="cv-purpose" id="cvPurpose" rows="4">' + esc(c.purpose) + '</textarea>' +
+        '<div class="cv-pl">②</div><textarea class="cv-purpose" id="cvPurpose2" rows="3">' + esc(c.purpose2 || '') + '</textarea>' +
         '<div class="cv-h">2) 조직과 인원현황</div><table class="grid cv-tbl"><colgroup><col style="width:18%"><col style="width:18%"><col><col style="width:9%"></colgroup>' +
         '<tr><th>직  책</th><th>이  름</th><th>주  소</th><th class="no-print"></th></tr>';
       c.members.forEach(function (m, i) {
@@ -3210,6 +3221,7 @@ body{
       box.addEventListener('input', function (e) {
         var el = e.target, c = cover();
         if (el.id === 'cvPurpose') c.purpose = el.value;
+        if (el.id === 'cvPurpose2') c.purpose2 = el.value;
         var k = el.getAttribute('data-cv'); if (k) { var p = k.split('.'); c.members[+p[0]][+p[1]] = el.value; }
         saveSoon();
       });
@@ -3222,17 +3234,21 @@ body{
       box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) renderCover(); }, 0); });
     })();
     function coverXml(Y) {
-      var c = cover(), BOLD = 10, N = 9, amt = c.shares * c.parValue, out = '';
+      // 본문 13pt(39), 제목·표 머리 13pt 남색 굵게(11), 표 머리·첫 칸·합계 = 연한 파랑 바탕(49)
+      var c = cover(), B13 = 39, H13 = 11, HEAD = 49, amt = c.shares * c.parValue, out = '';
       out += '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="1" columnBreak="0" merged="0"><hp:run charPrIDRef="29"><hp:t>' + xe('< ' + Y + '년도 결산 보고서 >') + '</hp:t></hp:run></hp:p>';
-      out += paraXml('', N, 'C') + paraXml('1) 회사의 목적', 11, 'L') + paraXml('   ① ' + c.purpose, N, 'L') + paraXml('', N, 'C');
-      out += paraXml('2) 조직과 인원현황', 11, 'L');
-      var rows = [['직  책', '이  름', '주  소'].map(function (t) { return { t: t, ch: 25, bf: 49 }; })];
-      c.members.filter(function (m) { return (m[0] || m[1] || m[2]); }).forEach(function (m) { rows.push([{ t: m[0] }, { t: m[1] }, { t: m[2] || '-' }]); });
-      out += tableXml(rows, [10000, 10000, 30000], 1700) + paraXml('', N, 'C');
-      out += paraXml('3) 주식에 관한 사항', 11, 'L') + paraXml('① 회사가 발행한 주식의 총수 : ' + c.shares + '주', N, 'L') + paraXml('② 1 주의 금액 : 일천원', N, 'L') + paraXml('③ 발행한 주식의 종류와 수', N, 'L');
-      out += tableXml([['주식의종류', '주  식  수', '금     액', '구   성    비', '비고'].map(function (t) { return { t: t, ch: 25, bf: 49 }; }),
-                       [{ t: '보   통   주' }, { t: c.shares + '주' }, { t: C.formatWon(amt) + '원' }, { t: '100%' }, { t: '' }],
-                       [{ t: '합      계' }, { t: c.shares + '주' }, { t: C.formatWon(amt) + '원' }, { t: '100%' }, { t: '' }]], [10000, 10000, 12000, 10000, 8000], 1700);
+      out += paraXml('', B13, 'C') + paraXml('1) 회사의 목적', H13, 'L') + paraXml('   ① ' + c.purpose, B13, 'L');
+      if (c.purpose2) out += paraXml('   ② ' + c.purpose2, B13, 'L');
+      out += paraXml('', B13, 'C') + paraXml('2) 조직과 인원현황', H13, 'L');
+      var rows = [['직  책', '이  름', '주  소'].map(function (t) { return { t: t, ch: H13, bf: HEAD }; })];
+      c.members.filter(function (m) { return (m[0] || m[1] || m[2]); }).forEach(function (m) { rows.push([{ t: m[0], ch: H13, bf: HEAD }, { t: m[1], ch: B13 }, { t: m[2] || '-', ch: B13 }]); });
+      // 표 두 개를 세로로 늘려 A4 한 장을 채움 (표 줄 수에 맞춰 줄 높이 자동 계산, 약 11.8mm)
+      var RH = Math.max(2000, Math.min(4000, Math.floor(47000 / (rows.length + 3))));
+      out += tableXml(rows, [10000, 10000, 30000], RH) + paraXml('', B13, 'C');
+      out += paraXml('3) 주식에 관한 사항', H13, 'L') + paraXml('① 회사가 발행한 주식의 총수 : ' + c.shares + '주', B13, 'L') + paraXml('② 1 주의 금액 : 일천원', B13, 'L') + paraXml('③ 발행한 주식의 종류와 수', B13, 'L');
+      out += tableXml([['주식의종류', '주 식 수', '금   액', '구 성 비', '비고'].map(function (t) { return { t: t, ch: H13, bf: HEAD }; }),
+                       [{ t: '보 통 주', ch: H13, bf: HEAD }, { t: c.shares + '주', ch: B13 }, { t: C.formatWon(amt) + '원', ch: B13 }, { t: '100%', ch: B13 }, { t: '', ch: B13 }],
+                       [{ t: '합   계', ch: H13, bf: HEAD }, { t: c.shares + '주', ch: H13, bf: HEAD }, { t: C.formatWon(amt) + '원', ch: H13, bf: HEAD }, { t: '100%', ch: H13, bf: HEAD }, { t: '', bf: HEAD }]], [10000, 10000, 12000, 10000, 8000], RH);
       return out;
     }
 
@@ -3304,6 +3320,36 @@ body{
       });
     }
 
+    // 수입·지출 표(원본 양식 4번째 표): 글자 1pt 작게(양식에 있는 같은 모양의 작은 글자로 바꿈), 줄 높이 85%
+    function shrinkIncome(doc) {
+      var tb = doc.getElementsByTagNameNS(HP, 'tbl')[3]; if (!tb) return;
+      var MAP = { '7': '6', '21': '6', '22': '8', '24': '23' };   // 12→11pt, 14→13pt (빨강 14→13pt)
+      Array.prototype.forEach.call(tb.getElementsByTagNameNS(HP, 'run'), function (r) {
+        var c = r.getAttribute('charPrIDRef'); if (MAP[c]) r.setAttribute('charPrIDRef', MAP[c]);
+      });
+      var H = 0;
+      Array.prototype.forEach.call(tb.getElementsByTagNameNS(HP, 'tr'), function (tr) {
+        var mx = 0;
+        Array.prototype.forEach.call(tr.getElementsByTagNameNS(HP, 'cellSz'), function (z) {
+          var h = Math.round(+z.getAttribute('height') * 0.85); z.setAttribute('height', h); if (h > mx) mx = h;
+        });
+        H += mx;
+      });
+      Array.prototype.forEach.call(tb.getElementsByTagNameNS(HP, 'cellMargin'), function (m) { m.setAttribute('top', '60'); m.setAttribute('bottom', '60'); });
+      var sz = tb.getElementsByTagNameNS(HP, 'sz')[0]; if (sz && H) sz.setAttribute('height', H);
+      Array.prototype.slice.call(tb.getElementsByTagNameNS(HP, 'linesegarray')).forEach(function (l) { l.parentNode.removeChild(l); });   // 줄 위치는 한글이 다시 계산
+    }
+    function useMalgun(files) {
+      var hf = files.filter(function (f) { return f.name === 'Contents/header.xml'; })[0]; if (!hf) return;
+      var x = new TextDecoder().decode(hf.data);
+      var faces = (x.match(/<hh:fontface lang="HANGUL"[\s\S]*?<\/hh:fontface>/) || [''])[0];
+      var m = faces.match(/<hh:font id="(\d+)" face="맑은 고딕"/); if (!m) return;   // 양식에 맑은 고딕이 없으면 그대로
+      var id = m[1];
+      x = x.replace(/<hh:fontRef hangul="\d+" latin="\d+" hanja="\d+" japanese="\d+" other="\d+" symbol="\d+" user="\d+"\/>/g,
+        '<hh:fontRef hangul="' + id + '" latin="' + id + '" hanja="' + id + '" japanese="' + id + '" other="' + id + '" symbol="' + id + '" user="' + id + '"/>');
+      hf.data = new TextEncoder().encode(x);
+    }
+
     function exportHwpx(buf) {
       var msg = $('hxMsg');
       msg.className = 'eb-msg'; msg.textContent = '한글 파일을 만드는 중…';
@@ -3316,6 +3362,8 @@ body{
         if (doc.getElementsByTagName('parsererror').length) throw new Error('양식 파일을 읽을 수 없습니다');
         fillLedger(doc, Y);
         paintSumRows(doc, files);
+        shrinkIncome(doc);   // 수입·지출 표를 약간 작게 (항목별 표와 한 장에)
+        useMalgun(files);   // 모든 글꼴을 맑은 고딕으로
         insertItems(doc, Y, 17);
         insertReport(doc, $('hxReport').checked, Y);   // 맨 앞: 결산 보고서 → 공식 양식 재무상태표·손익계산서·이익잉여금처분계산서
         var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + new XMLSerializer().serializeToString(doc).replace(/^<\?xml[^>]*\?>\s*/, '');
