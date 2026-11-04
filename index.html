@@ -3557,9 +3557,22 @@ body{
       };
       if (ops) ops.push(run); else run();
     }
-    function drawReportImage() {   // 원래 결산 보고서 화면 모양 그대로 (요약 3칸·수입/지출 표·은행 두 표 나란히·날짜/서명 상자)
+    // 카톡 사진: 아이폰 화면(세로 19.5 : 가로 9)을 꽉 채우게 — 먼저 그려 보고 모자란 높이만큼 줄 높이·글씨를 늘려 다시 그림
+    function drawReportImage() {
+      var W = 1080, target = Math.round(W * 1.95), best = drawReportImageAt(1);   // 화면(1:2.17)보다 조금 짧게 → 위쪽 카메라 구멍·상태줄에 제목이 안 가리게
+      if (best.height >= target) return best;   // 내용이 이미 길면 그대로
+      var lo = 1, hi = 1.9;   // 화면 높이를 넘지 않는 가장 큰 비율을 찾음 (글이 줄바꿈되면 높이가 계단처럼 변해서 반씩 좁혀 감)
+      for (var k = 0; k < 7; k++) {
+        var mid = (lo + hi) / 2, c = drawReportImageAt(mid);
+        if (c.height <= target) { lo = mid; best = c; } else hi = mid;
+      }
+      return best;
+    }
+    function drawReportImageAt(vs) {   // 원래 결산 보고서 화면 모양 그대로 (요약 3칸·수입/지출 표·은행 두 표 나란히·날짜/서명 상자). vs = 세로로 늘리는 비율
       var W = 1080, P = 28, TW = W - 2 * P, FONT = '"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
       var NAVY = '#1f3a68', INK = '#111', LINE = '#2b3a55', BLUE = '#e8f0fb', PEACH = '#fde9d9', MINT = '#e6f6f2', GRAY = '#efefef', RED = '#c62828', GOLD = '#fff3cf', ZEBRA = '#f5f8fd';
+      var fs = 1 + (vs - 1) * 0.55;   // 글씨는 줄 높이보다 조금만 키움 (가로 폭은 그대로라서)
+      function H(n) { return Math.round(n * vs); } function F(n) { return Math.round(n * fs); }
       var c = document.createElement('canvas'), g = c.getContext('2d'), ops = [], y = 0;
       function font(px, wt) { return (wt || 400) + ' ' + px + 'px ' + FONT; }
       function T(t, x, yy, px, wt, color, al) { ops.push(function () { g.font = font(px, wt); g.fillStyle = color || INK; g.textAlign = al || 'left'; g.textBaseline = 'middle'; g.fillText(t, x, yy); g.textAlign = 'left'; }); }
@@ -3582,19 +3595,19 @@ body{
         return yy;
       }
       function v(el) { return el ? (el.value != null ? el.value : (el.innerText || el.textContent || '')).replace(/\s+/g, ' ').trim() : ''; }
-      // 제목 + 초록 줄
-      drawTitleBand(g, ops, P, 14, TW, 100, txt(RPT.querySelector('.titleText')), FONT); y = 14 + 100 + 8 + 22;
+      // 제목 띠
+      var TB = H(100); drawTitleBand(g, ops, P, H(14), TW, TB, txt(RPT.querySelector('.titleText')), FONT); y = H(14) + TB + 8 + H(22);
       // 요약 3칸
-      var heads = Array.prototype.map.call(RPT.querySelectorAll('.summary .sumHead'), txt), cw = TW / 3;
-      R(P - 1, y - 1, TW + 2, 122, null, 3);
+      var heads = Array.prototype.map.call(RPT.querySelectorAll('.summary .sumHead'), txt), cw = TW / 3, sh1 = H(48), sh2 = H(72);
+      R(P - 1, y - 1, TW + 2, sh1 + sh2 + 2, null, 3);
       [[BLUE, val('carry'), INK], [PEACH, val('net'), INK], [MINT, val('endBal'), RED]].forEach(function (s, i) {
-        R(P + cw * i, y, cw, 48, s[0], 1.5); R(P + cw * i, y + 48, cw, 72, '#fff', 1.5);
-        T(heads[i] || '', P + cw * i + cw / 2, y + 25, fit(heads[i] || '', 22, 800, cw - 16), 800, INK, 'center');
-        T(s[1], P + cw * (i + 1) - 14, y + 86, 34, 800, s[2], 'right');
+        R(P + cw * i, y, cw, sh1, s[0], 1.5); R(P + cw * i, y + sh1, cw, sh2, '#fff', 1.5);
+        T(heads[i] || '', P + cw * i + cw / 2, y + sh1 / 2 + 1, fit(heads[i] || '', F(22), 800, cw - 16), 800, INK, 'center');
+        T(s[1], P + cw * (i + 1) - 14, y + sh1 + sh2 / 2 + 2, fit(s[1], F(34), 800, cw - 24), 800, s[2], 'right');
       });
-      y += 140;
+      y += sh1 + sh2 + H(20);
       // 수입/지출 내역서
-      T('○ ' + txt($('titleIncomeExpense')), P, y + 16, 24, 800, INK); y += 40;
+      var stH = H(40); T('○ ' + txt($('titleIncomeExpense')), P, y + stH / 2 - 4, F(24), 800, INK); y += stH;
       var ieCols = [TW * 0.09, TW * 0.23, TW * 0.18, TW * 0.09, TW * 0.23, TW * 0.18];   // 수입·지출 반반 (비고 없음)
       var ieRows = [
         [{ t: '수    입', cs: 3, bg: NAVY, color: '#fff', wt: 800 }, { t: '지    출', cs: 3, bg: NAVY, color: '#fff', wt: 800 }],
@@ -3605,18 +3618,18 @@ body{
         ieRows.push([{ t: v(D[0]), bg: z }, { t: v(f[0]), bg: z }, { t: v(f[1]), al: 'right', bg: z }, { t: v(D[1]), bg: z }, { t: v(f[2]), bg: z }, { t: v(f[3]), al: 'right', bg: z }]);
       });
       ieRows.push([{ t: '합    계', cs: 2, bg: GOLD, wt: 800, color: NAVY }, { t: val('incSum'), al: 'right', bg: GOLD, wt: 800, color: NAVY }, { t: '합    계', cs: 2, bg: GOLD, wt: 800, color: NAVY }, { t: val('expSum'), al: 'right', bg: GOLD, wt: 800, color: NAVY }]);
-      var ieTop = y; y = table(P, y, ieCols, ieRows, 34, 18); R(P - 1, ieTop - 1, TW + 2, y - ieTop + 2, null, 3);
+      var ieTop = y; y = table(P, y, ieCols, ieRows, H(34), F(18)); R(P - 1, ieTop - 1, TW + 2, y - ieTop + 2, null, 3);
       (function (x, y0, y1) { ops.push(function () { g.strokeStyle = NAVY; g.lineWidth = 2; [-2.5, 2.5].forEach(function (d) { g.beginPath(); g.moveTo(x + d, y0); g.lineTo(x + d, y1); g.stroke(); }); }); })(P + TW / 2, ieTop, y);   // 가운데 두 줄 분리선
-      y += 22;
+      y += H(22);
       // 은행 입출금 내역 (기업은행 · 농협 나란히)
-      T('○ ' + txt($('titleBank')), P, y + 16, 24, 800, INK); y += 40;
+      T('○ ' + txt($('titleBank')), P, y + stH / 2 - 4, F(24), 800, INK); y += stH;
       var titles = Array.prototype.map.call(RPT.querySelectorAll('.bankTopTitle'), txt), prevL = Array.prototype.map.call(RPT.querySelectorAll('.prevRow .label'), txt);
-      var gap = 14, bw = (TW - 24 - gap) / 2, bx0 = P + 12, bankTop = y, bottoms = [];
+      var gap = 14, bw = (TW - 24 - gap) / 2, bx0 = P + 12, bankTop = y, bottoms = [], bandH = H(34);
       [['#ibTable', 'ibPrev', 'ibInSum', 'ibOutSum', 'ibEnd'], ['#nhTable', 'nhPrev', 'nhInSum', 'nhOutSum', 'nhEnd']].forEach(function (bk, k) {
-        var bx = bx0 + k * (bw + gap), yy = bankTop + 10;
-        (function (by) { ops.push(function () { var gr = g.createLinearGradient(bx, 0, bx + bw, 0); gr.addColorStop(0, '#1f3a68'); gr.addColorStop(1, '#2f5d9a'); g.fillStyle = gr; g.fillRect(bx, by + 2, bw, 34); }); })(yy);
-        T(titles[k] || '', bx + bw / 2, yy + 20, 20, 800, '#fff', 'center'); yy += 44;
-        yy = table(bx, yy, [bw * 0.3, bw * 0.7], [[{ t: prevL[k] || '전월이월액', bg: '#e8eef9', wt: 700, color: NAVY }, { t: val(bk[1]), al: 'right', color: RED, wt: 700 }]], 36, 17) + 8;
+        var bx = bx0 + k * (bw + gap), yy = bankTop + H(10);
+        (function (by) { ops.push(function () { var gr = g.createLinearGradient(bx, 0, bx + bw, 0); gr.addColorStop(0, '#1f3a68'); gr.addColorStop(1, '#2f5d9a'); g.fillStyle = gr; g.fillRect(bx, by + 2, bw, bandH); }); })(yy);
+        T(titles[k] || '', bx + bw / 2, yy + 2 + bandH / 2, F(20), 800, '#fff', 'center'); yy += bandH + H(10);
+        yy = table(bx, yy, [bw * 0.3, bw * 0.7], [[{ t: prevL[k] || '전월이월액', bg: '#e8eef9', wt: 700, color: NAVY }, { t: val(bk[1]), al: 'right', color: RED, wt: 700 }]], H(36), F(17)) + H(8);
         var cols = [bw * 0.14, bw * 0.2, bw * 0.22, bw * 0.22, bw * 0.22];
         var rows = [[{ t: '날 짜', wt: 700 }, { t: '적 요', wt: 700 }, { t: '입 금', bg: BLUE, wt: 700 }, { t: '출 금', bg: PEACH, wt: 700 }, { t: '잔 액', bg: MINT, wt: 700 }]];
         RPT.querySelectorAll(bk[0] + ' tbody tr:not(.rowHide)').forEach(function (tr, i) {
@@ -3624,38 +3637,47 @@ body{
           rows.push([{ t: v(f[0]), bg: z }, { t: v(f[1]), bg: z }, { t: v(f[2]), al: 'right', bg: z }, { t: v(f[3]), al: 'right', bg: z }, { t: v(f[4]), al: 'right', bg: z }]);
         });
         rows.push([{ t: '합 계', wt: 800, bg: GOLD, color: NAVY }, { t: '', bg: GOLD }, { t: val(bk[2]), al: 'right', wt: 800, bg: GOLD, color: NAVY }, { t: val(bk[3]), al: 'right', wt: 800, bg: GOLD, color: NAVY }, { t: val(bk[4]), al: 'right', wt: 800, color: RED, bg: GOLD }]);
-        var tt = yy; yy = table(bx, yy, cols, rows, 30, 15); R(bx - 1, tt - 1, bw + 2, yy - tt + 2, null, 2.5);
+        var tt = yy; yy = table(bx, yy, cols, rows, H(30), F(15)); R(bx - 1, tt - 1, bw + 2, yy - tt + 2, null, 2.5);
         bottoms.push(yy);
       });
-      y = Math.max(bottoms[0], bottoms[1]) + 12; R(P - 1, bankTop - 1, TW + 2, y - bankTop + 2, null, 3); y += 20;
+      y = Math.max(bottoms[0], bottoms[1]) + H(12); R(P - 1, bankTop - 1, TW + 2, y - bankTop + 2, null, 3); y += H(20);
       // 주민 안내 (1가구당 보상금은 크게, 설명은 굵게)
       var X = shareCalc(), Bg = shareBig(X), sl = shareLines(X), lines = [];
-      sl.forEach(function (x) { var nx = /^【다음 달/.test(x), px = nx ? 25 : 21; g.font = font(px, nx ? 800 : 700); var line = ''; ('· ' + x).split('').forEach(function (ch) { if (g.measureText(line + ch).width > TW - 30 && line) { lines.push({ t: line, nx: nx }); line = ch; } else line += ch; }); if (line) lines.push({ t: line, nx: nx }); });
-      var LH = function (l) { return l.nx ? 38 : 32; }, linesH = lines.reduce(function (a, l) { return a + LH(l); }, 0);   // 다음 달 예상 줄은 더 크게
-      var bigH = Bg ? 108 : 0, bh = 44 + bigH + linesH + 14; R(P, y, TW, 40, BLUE); R(P, y, TW, bh, null, 2);
-      T('■ 주민 안내', P + 14, y + 21, 20, 800, NAVY);
-      var yb = y + 48;
+      var pxN = F(21);   // 보통 줄들은 같은 크기로 (가장 긴 줄이 한 줄에 들어가는 크기)
+      sl.forEach(function (x) { if (!/^【다음 달/.test(x)) pxN = Math.min(pxN, fit('· ' + x, F(21), 700, TW - 30)); });
+      sl.forEach(function (x) {   // 한 항목은 한 줄로: 넘치면 글씨를 조금 줄여 맞춤 (너무 작아지면 그때만 두 줄)
+        var nx = /^【다음 달/.test(x), wt = nx ? 800 : 700, t = '· ' + x, px = nx ? fit(t, F(25), wt, TW - 30) : pxN;
+        if (px >= (nx ? 19 : 17)) { lines.push({ t: t, nx: nx, px: px }); return; }
+        px = F(nx ? 25 : 21); g.font = font(px, wt); var line = '';
+        t.split('').forEach(function (ch) { if (g.measureText(line + ch).width > TW - 30 && line) { lines.push({ t: line, nx: nx, px: px }); line = ch; } else line += ch; }); if (line) lines.push({ t: line, nx: nx, px: px });
+      });
+      var LH = function (l) { return H(l.nx ? 38 : 32); }, linesH = lines.reduce(function (a, l) { return a + LH(l); }, 0);   // 다음 달 예상 줄은 더 크게
+      var hdH = H(40), bxH = H(96), bigH = Bg ? bxH + H(12) : 0, bh = hdH + H(4) + bigH + linesH + H(14); R(P, y, TW, hdH, BLUE); R(P, y, TW, bh, null, 2);
+      T('■ 주민 안내', P + 14, y + hdH / 2 + 1, F(20), 800, NAVY);
+      var yb = y + hdH + H(8);
       if (Bg) {
-        (function (by) { ops.push(function () { g.fillStyle = '#fff6e0'; g.fillRect(P + 12, by, TW - 24, 96); g.strokeStyle = '#e0b84c'; g.lineWidth = 2; g.strokeRect(P + 12, by, TW - 24, 96); }); })(yb);
-        (function (yb) { ops.push(function () {   // 「11월 1가구당 보상금  약 3,600,000원」 한 줄 가운데
-          g.textBaseline = 'middle'; g.font = font(26, 900); var w1 = g.measureText(Bg.head + '  ').width; g.font = font(40, 900); var w2 = g.measureText(Bg.amt).width, x0 = W / 2 - (w1 + w2) / 2;
-          g.textAlign = 'left'; g.font = font(26, 900); g.fillStyle = NAVY; g.fillText(Bg.head + '  ', x0, yb + 36); g.font = font(40, 900); g.fillStyle = RED; g.fillText(Bg.amt, x0 + w1, yb + 34);
+        (function (by) { ops.push(function () { g.fillStyle = '#fff6e0'; g.fillRect(P + 12, by, TW - 24, bxH); g.strokeStyle = '#e0b84c'; g.lineWidth = 2; g.strokeRect(P + 12, by, TW - 24, bxH); }); })(yb);
+        (function (yb) { ops.push(function () {   // 「올해 누적 1가구당 보상금  약 3,600,000원」 한 줄 가운데
+          var p1 = F(26), p2 = F(40); g.textBaseline = 'middle'; g.font = font(p1, 900); var w1 = g.measureText(Bg.head + '  ').width; g.font = font(p2, 900); var w2 = g.measureText(Bg.amt).width;
+          if (w1 + w2 > TW - 50) { var r = (TW - 50) / (w1 + w2); p1 = Math.floor(p1 * r); p2 = Math.floor(p2 * r); g.font = font(p1, 900); w1 = g.measureText(Bg.head + '  ').width; g.font = font(p2, 900); w2 = g.measureText(Bg.amt).width; }
+          var x0 = W / 2 - (w1 + w2) / 2;
+          g.textAlign = 'left'; g.font = font(p1, 900); g.fillStyle = NAVY; g.fillText(Bg.head + '  ', x0, yb + bxH * 0.375); g.font = font(p2, 900); g.fillStyle = RED; g.fillText(Bg.amt, x0 + w1, yb + bxH * 0.355);
         }); })(yb);
-        T(Bg.sub, W / 2, yb + 76, fit(Bg.sub, 17, 700, TW - 50), 700, '#555', 'center');
+        T(Bg.sub, W / 2, yb + bxH * 0.79, fit(Bg.sub, F(17), 700, TW - 50), 700, '#555', 'center');
         yb += bigH;
       }
-      var ly = yb - 2; lines.forEach(function (l) { ly += LH(l); T(l.t, P + 14, ly - LH(l) / 2, l.nx ? 25 : 21, l.nx ? 800 : 700, l.nx ? '#8a4b00' : INK); }); y += bh + 20;
+      var ly = yb - 2; lines.forEach(function (l) { ly += LH(l); T(l.t, P + 14, ly - LH(l) / 2, l.px, l.nx ? 800 : 700, l.nx ? '#8a4b00' : INK); }); y += bh + H(20);
       // 날짜 · 서명 상자 + 직인 (두 줄 그대로, 크기만 작게)
-      var dTop = y, DH = 112; R(P, dTop, TW, DH, '#fff', 3);
-      var dt = txt($('reportDateText')), sign = txt(RPT.querySelector('.signLine')), spx = fit(sign, 25, 800, TW - 120);
-      T(dt, W / 2, dTop + 34, 26, 800, NAVY, 'center'); T(sign, W / 2, dTop + 78, spx, 800, NAVY, 'center');
-      y = dTop + DH + 24;
+      var dTop = y, DH = H(112); R(P, dTop, TW, DH, '#fff', 3);
+      var dt = txt($('reportDateText')), sign = txt(RPT.querySelector('.signLine')), spx = fit(sign, F(25), 800, TW - 120);
+      T(dt, W / 2, dTop + DH * 0.3, F(26), 800, NAVY, 'center'); T(sign, W / 2, dTop + DH * 0.7, spx, 800, NAVY, 'center');
+      y = dTop + DH + H(24);
       c.width = W; c.height = Math.ceil(y);
       g.fillStyle = '#fff'; g.fillRect(0, 0, W, c.height);
       ops.forEach(function (f) { f(); });
-      g.font = font(spx, 800); var sx = W / 2 + g.measureText(sign).width / 2;
+      g.font = font(spx, 800); var sx = W / 2 + g.measureText(sign).width / 2, SZ = Math.round(64 * fs);
       var st = document.querySelector('.ceoStampBig'), si = st && st.complete && st.naturalWidth ? st : sealImgEl;
-      if (si.complete && si.naturalWidth) { g.globalCompositeOperation = 'multiply'; g.drawImage(si, sx - 46, dTop + 44, 64, 64); g.globalCompositeOperation = 'source-over'; }
+      if (si.complete && si.naturalWidth) { g.globalCompositeOperation = 'multiply'; g.drawImage(si, sx - SZ * 0.72, dTop + DH * 0.7 - SZ / 2, SZ, SZ); g.globalCompositeOperation = 'source-over'; }
       return c;
     }
     (function () {
