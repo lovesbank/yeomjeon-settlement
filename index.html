@@ -1060,6 +1060,15 @@ body{
   <!-- =========================================================
        ⏎ 엔터칸 : 위 결산 보고서의 수입 → 매출액, 지출 → 지출내역서
        ========================================================= -->
+  <section id="kakaoBox" class="ebox no-print">
+    <div class="eb-title">📷 카톡 공지용 사진 저장</div>
+    <p class="eb-desc">위 결산 보고서를 <b>사진 한 장(PNG)</b>으로 만듭니다. 아이폰에서는 공유 창이 뜨면 <b>카카오톡</b>을 눌러 바로 보내거나 <b>「이미지 저장」</b>으로 사진첩에 저장하세요. (금액이 적힌 줄만 나오고, 빈 줄은 빠집니다)</p>
+    <div class="eb-row">
+      <button type="button" class="eb-btn" id="kkSave" style="background:#f2c200;color:#3a1d1d">📷 사진으로 저장 / 카톡 보내기</button>
+    </div>
+    <div class="eb-msg" id="kkMsg" aria-live="polite"></div>
+  </section>
+
   <section id="enterBox" class="ebox no-print">
     <div class="eb-title">⏎ 결산 보고서 → 장부 자동 기입</div>
     <p class="eb-desc">위 결산 보고서를 작성하면 <b>수입</b>은 아래 <b>SMP.REC 매출액</b> 그 달에, <b>지출</b>은 <b>지출내역서</b> 그 달에 자동으로 들어가고,
@@ -2999,6 +3008,122 @@ body{
       box.addEventListener('input', function (e) { var k = e.target.getAttribute('data-k'); if (!k) return; shareInfo()[k] = k === 'name' ? e.target.value : (parseInt(e.target.value, 10) || 0); saveSoon(); });
       box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) renderShare(); }, 0); });
       var t; RPT.addEventListener('input', function (e) { if (box.contains(e.target)) return; clearTimeout(t); t = setTimeout(renderShare, 300); });
+    })();
+
+    /* ── 카톡 공지용 사진: 결산 보고서 내용을 캔버스에 직접 그려 PNG로 (외부 도구 없이, 아이폰에서도 동작) ── */
+    function drawReportImage() {
+      var W = 1080, P = 40, FONT = '"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif', NAVY = '#1f3a68', LINE = '#9aa5b8';
+      var c = document.createElement('canvas'), g = c.getContext('2d'), ops = [], y = 0;
+      function font(px, wt) { return (wt || 400) + ' ' + px + 'px ' + FONT; }
+      function wrap(t, px, wt, maxW) {
+        g.font = font(px, wt); var out = [], line = '';
+        String(t).split('').forEach(function (ch) { if (g.measureText(line + ch).width > maxW && line) { out.push(line); line = ch.trim() ? ch : ''; } else line += ch; });
+        if (line) out.push(line); return out;
+      }
+      // 1) 그릴 내용 모으기 (높이 계산을 위해 먼저 목록으로)
+      function text(t, x, px, wt, color, align, h) { ops.push(['t', t, x, y + px, px, wt, color, align]); y += h || px * 1.5; }
+      function gap(h) { y += h; }
+      function table(cols, rows, opt) {   // cols: [{w, al}], rows: [{cells:[..], bg, bold, color}]
+        opt = opt || {}; var x0 = P, rh = opt.rh || 44;
+        rows.forEach(function (r) {
+          ops.push(['r', x0, y, W - 2 * P, rh, r.bg || '#fff']);
+          var x = x0;
+          cols.forEach(function (col, i) {
+            var t = r.cells[i] == null ? '' : String(r.cells[i]), px = opt.px || 22;
+            g.font = font(px, r.bold ? 700 : 400); while (px > 13 && g.measureText(t).width > col.w - 14) { px--; g.font = font(px, r.bold ? 700 : 400); }
+            var al = r.head ? 'center' : (col.al || 'left'), tx = al === 'right' ? x + col.w - 8 : al === 'center' ? x + col.w / 2 : x + 8;
+            ops.push(['t', t, tx, y + rh / 2 + px * 0.36, px, r.bold ? 700 : 400, (r.colors && r.colors[i]) || r.color || '#111', al]);
+            if (i) ops.push(['l', x, y, x, y + rh]);
+            x += col.w;
+          });
+          ops.push(['s', x0, y, W - 2 * P, rh]);
+          y += rh;
+        });
+      }
+      var TW = W - 2 * P, HEAD = '#dfe7f6';
+      // 제목
+      ops.push(['bar', y + 24]); gap(40);
+      text(txt(RPT.querySelector('.titleText')), W / 2, 48, 900, NAVY, 'center', 66);
+      ops.push(['bar2', y + 4]); gap(34);
+      // 요약 3칸
+      var heads = Array.prototype.map.call(RPT.querySelectorAll('.summary .sumHead'), txt);
+      table([{ w: TW / 3, al: 'right' }, { w: TW / 3, al: 'right' }, { w: TW / 3, al: 'right' }],
+        [{ cells: heads, head: 1, bold: 1, bg: HEAD }, { cells: [val('carry'), val('net'), val('endBal')], bold: 1, colors: ['#111', '#111', '#d32f2f'] }], { rh: 56, px: 28 });
+      gap(28);
+      // 수입/지출
+      text('● ' + txt($('titleIncomeExpense')), P, 26, 800, NAVY, 'left', 42);
+      var nl = txt(RPT.querySelector('.noteLine')); if (nl) { wrap(nl, 18, 400, TW).forEach(function (l) { text(l, P, 18, 400, '#555', 'left', 26); }); gap(6); }
+      var ie = [{ cells: ['수입 적요', '금액', '지출 적요', '금액', '비고'], head: 1, bold: 1, bg: HEAD }];
+      RPT.querySelectorAll('#incomeExpenseTable tbody tr').forEach(function (tr) {
+        var f = tr.querySelectorAll('input'), L = !!C.parseWon(f[1].value), R = !!C.parseWon(f[3].value);   // 금액이 있는 줄만
+        if (!L && !R) return;
+        ie.push({ cells: [L ? f[0].value : '', L && C.parseWon(f[1].value) ? f[1].value : '', R ? f[2].value : '', R && C.parseWon(f[3].value) ? f[3].value : '', f[4] ? f[4].value : ''] });
+      });
+      ie.push({ cells: ['합  계', val('incSum'), '합  계', val('expSum'), val('netFoot')], bold: 1, bg: '#eef3fc' });
+      table([{ w: TW * 0.25 }, { w: TW * 0.19, al: 'right' }, { w: TW * 0.25 }, { w: TW * 0.19, al: 'right' }, { w: TW * 0.12, al: 'right' }], ie);
+      gap(28);
+      // 은행
+      text('● ' + txt($('titleBank')), P, 26, 800, NAVY, 'left', 42);
+      var titles = Array.prototype.map.call(RPT.querySelectorAll('.bankTopTitle'), txt);
+      [['#ibTable', 'ibPrev', 'ibInSum', 'ibOutSum', 'ibEnd'], ['#nhTable', 'nhPrev', 'nhInSum', 'nhOutSum', 'nhEnd']].forEach(function (bk, k) {
+        var rows = [{ cells: [titles[k] || '', '', '전월이월액', '', val(bk[1])], bold: 1, bg: '#f4f6fa', colors: [NAVY, '', '#111', '', '#d32f2f'] },
+                    { cells: ['날짜', '적요', '입금', '출금', '잔액'], head: 1, bold: 1, bg: HEAD }];
+        RPT.querySelectorAll(bk[0] + ' tbody tr').forEach(function (tr) {
+          var f = tr.querySelectorAll('input'); if (!C.parseWon(f[2].value) && !C.parseWon(f[3].value)) return;   // 입금·출금이 있는 줄만
+          rows.push({ cells: [f[0].value, f[1].value, C.parseWon(f[2].value) ? f[2].value : '', C.parseWon(f[3].value) ? f[3].value : '', f[4].value] });
+        });
+        rows.push({ cells: ['합  계', '', val(bk[2]), val(bk[3]), val(bk[4])], bold: 1, bg: '#eef3fc', colors: ['', '', '', '', '#d32f2f'] });
+        table([{ w: TW * 0.14 }, { w: TW * 0.3 }, { w: TW * 0.18, al: 'right' }, { w: TW * 0.18, al: 'right' }, { w: TW * 0.2, al: 'right' }], rows, { rh: 40, px: 20 });
+        gap(16);
+      });
+      gap(12);
+      // 주민 안내
+      var sl = shareLines(shareCalc()), boxTop = y;
+      ops.push(['box', boxTop]); gap(12);
+      text('■ 주민 안내', P + 16, 24, 800, NAVY, 'left', 38);
+      sl.forEach(function (x) { wrap('· ' + x, 21, 500, TW - 32).forEach(function (l) { text(l, P + 16, 21, 500, '#222', 'left', 31); }); gap(4); });
+      gap(10); ops.push(['boxEnd', boxTop, y]); gap(30);
+      // 날짜 · 서명 · 직인
+      text(txt($('reportDateText')), W / 2, 30, 800, NAVY, 'center', 50);
+      var sign = txt(RPT.querySelector('.signLine')); text(sign, W / 2, 30, 800, NAVY, 'center', 40);
+      var signY = y - 40; gap(40);
+      c.width = W; c.height = Math.ceil(y);
+      g.fillStyle = '#fff'; g.fillRect(0, 0, W, c.height);
+      ops.forEach(function (o) {
+        if (o[0] === 'r') { g.fillStyle = o[5]; g.fillRect(o[1], o[2], o[3], o[4]); }
+        else if (o[0] === 's') { g.strokeStyle = LINE; g.lineWidth = 1.5; g.strokeRect(o[1], o[2], o[3], o[4]); }
+        else if (o[0] === 'l') { g.strokeStyle = LINE; g.lineWidth = 1; g.beginPath(); g.moveTo(o[1], o[2]); g.lineTo(o[3], o[4]); g.stroke(); }
+        else if (o[0] === 'bar') { g.fillStyle = '#9af55a'; g.fillRect(P, o[1] - 8, TW * 0.44, 8); g.fillRect(P + TW * 0.44, o[1] - 3, TW * 0.56, 3); }
+        else if (o[0] === 'bar2') { g.fillStyle = '#43963f'; g.fillRect(P, o[1], TW * 0.57, 3); g.fillRect(P + TW * 0.57, o[1] - 5, TW * 0.43, 8); }
+        else if (o[0] === 'boxEnd') { var gr = g.createLinearGradient(0, o[1], 0, o[1] + 46); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#c0cdef'); g.save(); g.globalCompositeOperation = 'destination-over'; g.fillStyle = gr; g.fillRect(P, o[1], TW, 46); g.restore(); g.strokeStyle = NAVY; g.lineWidth = 2; g.strokeRect(P, o[1], TW, o[2] - o[1]); }
+        else if (o[0] === 't') { g.font = font(o[4], o[5]); g.fillStyle = o[6]; g.textAlign = o[7] || 'left'; g.textBaseline = 'alphabetic'; g.fillText(o[1], o[2], o[3]); g.textAlign = 'left'; }
+      });
+      // 직인: 서명 줄 끝 글자 위
+      g.font = font(30, 800); var sw = g.measureText(sign).width, sx = W / 2 + sw / 2;
+      var st = document.querySelector('.ceoStampBig'), si = st && st.complete && st.naturalWidth ? st : sealImgEl;   // 보고서에 쓰는 직인 그대로
+      if (si.complete && si.naturalWidth) g.drawImage(si, sx - 58, signY - 30, 84, 84);
+      return c;
+    }
+    (function () {
+      var btn = $('kkSave'); if (!btn) return;
+      btn.addEventListener('click', function () {
+        var msg = $('kkMsg');
+        try {
+          var c = drawReportImage(), R = reportYM(), name = R.y + '년_' + R.m + '월_결산보고서.png';
+          c.toBlob(function (blob) {
+            if (!blob) { msg.textContent = '⚠ 사진을 만들지 못했습니다.'; return; }
+            var file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) { }
+            if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+              navigator.share({ files: [file], title: R.y + '년 ' + R.m + '월 결산 보고서' }).then(function () { msg.textContent = '✔ 공유 창을 열었습니다.'; })
+                .catch(function (e) { msg.textContent = e && e.name === 'AbortError' ? '취소했습니다.' : '⚠ 공유하지 못했습니다: ' + (e && e.message); });
+            } else {
+              var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+              setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+              msg.textContent = '✔ ' + name + ' 저장했습니다.';
+            }
+          }, 'image/png');
+        } catch (e) { msg.textContent = '⚠ 사진을 만들지 못했습니다: ' + e.message; }
+      });
     })();
     function reportXml() {
       var out = [], BOLD = 10, RED_BIG = 24, BIG = 22;
