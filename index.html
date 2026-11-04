@@ -5016,6 +5016,7 @@ body{
       });
       return {
         title: '제' + gi + '기 정기주주총회 의사록',
+        lead: '상법 제365조 제1항 및 정관의 규정에 의거하여 제' + gi + '기 정기주주총회를 다음과 같이 개최하였다.',   // 근거 법조문 (상법 제365조 ①: 정기총회는 매년 1회 일정한 시기에 소집)
         head: [
           '1. 회 사 명 : 염전마을주민발전주식회사' + (String(M.addr || '').trim() ? '  (본점 : ' + M.addr + ')' : ''),
           '2. 일    시 : ' + (D.no ? D.txt : '　　년　　월　　일') + ' ' + (M.time || ''),
@@ -5088,6 +5089,7 @@ body{
       var reg = P.extra.some(function (x) { return x.reg; });
       box.innerHTML = '<div class="cv-title">' + esc(P.title) + '</div><div class="mn-body">' +
         '<p class="no-print bz-hint">상법 제373조(의사록)와 공증 때 확인하는 사항(정족수·의결권 수·결의 요건·의장과 출석 이사 날인)을 갖춘 양식입니다. 주주 33명이 12주씩, 대표이사가 4주를 더 가져 <b>출석 의결권 = 출석 주주 수 × 12주 + 4주</b>로 자동 계산합니다(실제와 다르면 「출석 의결권」 칸에 직접 적으세요). 안건 이름을 적으면 결과 문장과 의결권 수가 자동으로 들어갑니다.</p>' +
+        '<p>' + esc(P.lead) + '</p>' +
         '<p>1. 회 사 명 : 염전마을주민발전주식회사 &nbsp; 본점 ' + inp('addr', 'w', '등기부상 본점 주소') + '</p>' +
         '<p>2. 일 &nbsp;&nbsp; 시 : ' + esc(P.date) + ' ' + inp('time', '', '오전 10시') + ' <span class="bz-hint no-print">(날짜는 표지의 「총회 날짜」)</span></p>' +
         '<p>3. 장 &nbsp;&nbsp; 소 : ' + inp('place', 'w', '염전마을 회관') + '</p>' +
@@ -5161,6 +5163,7 @@ body{
       function lh(pt) { return pt * 0.353 * 1.3 + 0.2; }
       function para(t, pt, cpl) { return Math.max(1, Math.ceil(String(t).length / cpl)) * lh(pt); }
       var h = 22;   // 제목 상자
+      h += para(P.lead, L.pt, L.cpl) + L.gapH;
       P.head.forEach(function (x) { h += para(x, L.pt, L.cpl); });
       h += L.gapH + para(P.open, L.pt, L.cpl) + L.gapH;
       [{ q: P.q, body: P.body }].concat(P.extra).forEach(function (x) { var c2 = Math.floor(L.cpl * 0.8); h += para(String(x.q).replace(/^제\d+호 의안 : /, ''), L.qpt, c2) + para(x.body, L.pt, c2) + L.gapH; });   // 오른쪽 칸(80% 폭)
@@ -5193,6 +5196,7 @@ body{
     }
     function minutesXml() {
       var P = minParts(), Lo = minLayout(P), L = Lo.L, B = L.B, BB = L.BB, G = L.gap, out = titleBlock(P.title, 1);
+      out += paraXml('   ' + P.lead, B, 'L') + paraXml('', G, 'L');
       P.head.forEach(function (x) { out += paraXml(x, B, 'L'); });
       out += paraXml('', G, 'L') + paraXml('   ' + P.open, B, 'L') + paraXml('', G, 'L');
       out += agendaXml(P.q, P.body, BB, B) + paraXml('', G, 'L');
