@@ -4253,7 +4253,7 @@ body{
       var h = 22;   // 제목 상자
       P.head.forEach(function (x) { h += para(x, L.pt, L.cpl); });
       h += L.gapH + para(P.open, L.pt, L.cpl) + L.gapH;
-      [{ q: P.q, body: P.body }].concat(P.extra).forEach(function (x) { h += para(x.q, L.qpt, L.cpl) + para(x.body, L.pt, L.cpl) + L.gapH; });
+      [{ q: P.q, body: P.body }].concat(P.extra).forEach(function (x) { var c2 = Math.floor(L.cpl * 0.8); h += para(String(x.q).replace(/^제\d+호 의안 : /, ''), L.qpt, c2) + para(x.body, L.pt, c2) + L.gapH; });   // 오른쪽 칸(80% 폭)
       h += para(P.close, L.pt, L.cpl) + L.gapH + para(P.end, L.pt, L.cpl) + lh(L.pt);
       h += lh(13) * 2 + lh(L.pt) + lh(13) + L.gapH;
       h += Math.ceil(P.others.length / L.pair) * (lh(L.pt) + (L.signGap ? L.gapH : 0));
@@ -4263,12 +4263,30 @@ body{
       for (var i = 0; i < MIN_LEVELS.length; i++) if (minEstimate(P, MIN_LEVELS[i]) <= 262) return { L: MIN_LEVELS[i], level: i, fits: true };
       return { L: MIN_LEVELS[MIN_LEVELS.length - 1], level: MIN_LEVELS.length - 1, fits: false };
     }
+    // 의안 한 개: 테두리 없는 두 칸 — 왼쪽 「제1호 의안 :」, 오른쪽 제목(굵게)과 회의 내용. 아래 글이 제목 시작 위치에 딱 맞음
+    function agendaXml(q, body, BB, B) {
+      var m = String(q).match(/^(제\d+호 의안)\s*:\s*(.*)$/), head = m ? m[1] + ' :' : '', title = m ? m[2] : String(q);
+      function P(t, ch) { return '<hp:p id="2147483648" paraPrIDRef="31" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + ch + '"><hp:t>' + xe(t) + '</hp:t></hp:run></hp:p>'; }
+      function cell(col, w, paras) {
+        return '<hp:tc name="" header="0" hasMargin="1" protect="0" editable="0" dirty="0" borderFillIDRef="2">' +
+          '<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="TOP" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">' + paras + '</hp:subList>' +
+          '<hp:cellAddr colAddr="' + col + '" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="' + w + '" height="1000"/><hp:cellMargin left="0" right="200" top="0" bottom="0"/></hp:tc>';
+      }
+      var W1 = 9600, W2 = 53000 - 9600 - 566;
+      tblSeq++;
+      return '<hp:p id="2147483648" paraPrIDRef="31" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="9">' +
+        '<hp:tbl id="' + tblSeq + '" zOrder="' + (tblSeq % 1000) + '" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="0" rowCnt="1" colCnt="2" cellSpacing="0" borderFillIDRef="2" noAdjust="0">' +
+        '<hp:sz width="' + (W1 + W2) + '" widthRelTo="ABSOLUTE" height="1000" heightRelTo="ABSOLUTE" protect="0"/>' +
+        '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>' +
+        '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="0" right="0" top="0" bottom="0"/>' +
+        '<hp:tr>' + cell(0, W1, P(head, BB)) + cell(1, W2, P(title, BB) + P(body, B)) + '</hp:tr></hp:tbl><hp:t/></hp:run></hp:p>';
+    }
     function minutesXml() {
       var P = minParts(), Lo = minLayout(P), L = Lo.L, B = L.B, BB = L.BB, G = L.gap, out = titleBlock(P.title, 1);
       P.head.forEach(function (x) { out += paraXml(x, B, 'L'); });
       out += paraXml('', G, 'L') + paraXml('   ' + P.open, B, 'L') + paraXml('', G, 'L');
-      out += paraXml(P.q, BB, 'L') + paraXml('   ' + P.body, B, 'L') + paraXml('', G, 'L');
-      P.extra.forEach(function (x) { out += paraXml(x.q, BB, 'L') + paraXml('   ' + x.body, B, 'L') + paraXml('', G, 'L'); });
+      out += agendaXml(P.q, P.body, BB, B) + paraXml('', G, 'L');
+      P.extra.forEach(function (x) { out += agendaXml(x.q, x.body, BB, B) + paraXml('', G, 'L'); });
       out += paraXml('   ' + P.close, B, 'L') + paraXml('', G, 'L') + paraXml('   ' + P.end, B, 'L') + paraXml('', B, 'L');
       out += paraXml(P.date, 40, 'C') + paraXml('염전마을주민발전주식회사', 40, 'C') + paraXml('', B, 'C');
       out += paraXml('의장  ' + P.ceo[0] + '   ' + P.ceo[1] + '   (인)', 40, 'C') + paraXml('', G, 'C');
