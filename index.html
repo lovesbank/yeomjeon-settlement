@@ -753,6 +753,7 @@ body{
   #ledger .doc-prev p{ margin:0 0 4px; } #ledger .doc-prev .cv-title{ margin:4px 0 14px; }
   #ledger .doc-tbl{ width:100%; margin:6px 0 10px; } #ledger .doc-tbl th{ background:#e8eef9; color:#1d2b5c; }
   #ledger .doc-pb{ border:0; border-top:2px dashed #c62828; margin:16px 0; }
+  #ledger .gm-prev .gm-pg{ display:block; width:100%; max-width:560px; margin:10px auto; border:1px solid #cfd6e4; box-shadow:0 2px 8px rgba(0,0,0,.08); }
   #ledger .doc-cover{ display:block; width:100%; max-width:520px; margin:0 auto; border:1px solid #dde3ef; }
   #ledger .bd-form p{ margin:4px 0; line-height:2; } #ledger .bd-form input{ font:inherit; padding:1px 5px; border:1px solid var(--lg-btn-line); border-radius:3px; background:#fffef2; }
   #ledger .bd-form input.w{ width:13em; }
@@ -858,7 +859,9 @@ body{
     body.pm-annual #ledger section.lsheet, body.pm-min #ledger section.lsheet, body.pm-board #ledger section.lsheet{ display:none !important; }
     body.pm-annual #ledger section#sec-title,body.pm-annual #ledger section#sec-cover,body.pm-annual #ledger section#sec-toc,body.pm-annual #ledger section#sec-biz,body.pm-annual #ledger section#sec-cmp,body.pm-annual #ledger section#sec-audit,body.pm-annual #ledger section#sec-off,body.pm-annual #ledger section#sec-revenue,body.pm-annual #ledger section#sec-expense,body.pm-annual #ledger section#sec-items,body.pm-annual #ledger section#sec-summary,body.pm-annual #ledger section#sec-accounts,body.pm-annual #ledger section#sec-receipt,body.pm-annual #ledger section#sec-resol{ display:block !important; }
     body.pm-annual #ledger section#sec-resol{ break-after:auto !important; page-break-after:auto !important; }
-    body.pm-holders #report, body.pm-notice #report, body.pm-proxy #report{ display:none !important; } body.pm-holders #ledger section.lsheet, body.pm-notice #ledger section.lsheet, body.pm-proxy #ledger section.lsheet{ display:none !important; }
+    body.pm-holders #report, body.pm-notice #report, body.pm-proxy #report, body.pm-gongmun #report{ display:none !important; } body.pm-holders #ledger section.lsheet, body.pm-notice #ledger section.lsheet, body.pm-proxy #ledger section.lsheet, body.pm-gongmun #ledger section.lsheet{ display:none !important; }
+    body.pm-gongmun #ledger section#sec-print{ display:block !important; break-after:auto !important; page-break-after:auto !important; }
+    #sec-print .gm-pg{ display:block; width:100%; max-height:270mm; object-fit:contain; margin:0 auto; break-after:page; page-break-after:always; } #sec-print .gm-pg:last-child{ break-after:auto; page-break-after:auto; }
     body.pm-min #ledger section#sec-print, body.pm-board #ledger section#sec-print, body.pm-holders #ledger section#sec-print, body.pm-notice #ledger section#sec-print, body.pm-proxy #ledger section#sec-print{ display:block !important; break-after:auto !important; }
     #sec-print .doc-prev{ border:0; padding:0; max-width:none; font-size:13pt; line-height:1.7; }   /* 본문 글자 13포인트 */
     #sec-print .doc-cover{ max-width:none; width:100%; border:0; }
@@ -1287,6 +1290,7 @@ body{
         <a href="#sec-notice">소집통지</a>
         <a href="#sec-proxy">위임장</a>
         <a href="#sec-board">이사회</a>
+        <a href="#sec-gongmun">공문</a>
         <a href="#sec-jg">정관</a>
         <a href="#sec-holders">주주명부</a>
       </nav>
@@ -1413,6 +1417,10 @@ body{
 
       <section id="sec-board" class="lsheet no-print">
         <div id="boardBox"></div>
+      </section>
+
+      <section id="sec-gongmun" class="lsheet no-print">
+        <div id="gmBox"></div>
       </section>
 
       <section id="sec-jg" class="lsheet no-print">
@@ -2681,6 +2689,7 @@ body{
       renderNotice();
       renderProxy();
       renderBoard();
+      try { renderGongmun(); } catch (e) { }
       renderJg();
       renderHolders();
       renderBiz();
@@ -4157,7 +4166,9 @@ body{
       });
       return g ? inc / g : 0;
     }
-    function bizHead(N) { return N.O ? '제 ' + N.O.meta.gi + '기 (' + N.O.meta.perTxt + ')' : year + '년'; }
+    function perDots(Y) { return Y + '. 1. 1. ~ ' + Y + '. 12. 31.'; }   // 공문서 날짜 표기 (2026. 1. 1. ~ 2026. 12. 31.)
+    function noZero(t) { return String(t).replace(/(^|\s)0(\d)/g, '$1$2'); }   // 2026년 01월 01일 → 2026년 1월 1일
+    function bizHead(N) { return N.O ? '제' + N.O.meta.gi + '기(' + noZero(N.O.meta.perTxt) + ')' : year + '년'; }
     function bizPerf(N) {
       var w = C.formatWon, s = N.s, r = [
         ['발전 매출 (SMP·REC 입금액)', w(s.totalIncome) + '원', 1],
@@ -4219,7 +4230,7 @@ body{
       box.innerHTML = h;
     }
     function auditLines(N) {
-      var per = N.O ? '제' + N.O.meta.gi + '기(' + N.O.meta.perTxt + ')' : year + '년';
+      var per = N.O ? '제' + N.O.meta.gi + '기(' + noZero(N.O.meta.perTxt) + ')' : year + '년';
       return [
         ['', '본 감사는 염전마을주민발전주식회사의 ' + per + ' 회계연도의 회계 및 업무를 감사하였으며, 그 결과를 다음과 같이 보고합니다.'],
         ['1. 감사 방법의 개요', '회계에 관하여는 회계장부를 은행 거래내역서와 서로 대조·확인하고, 재무상태표·손익계산서·이익잉여금처분계산서를 검토하는 등 필요하다고 인정되는 감사 절차를 실시하였습니다. 업무에 관하여는 이사회에 참석하여 의사 진행을 살피고, 필요한 경우 이사로부터 보고를 받았습니다.'],
@@ -4254,7 +4265,7 @@ body{
       }) };
     }
     function cmpFmt(v, k) { return (v > 0 ? '+' : v < 0 ? '−' : '') + (k === 'smp' ? smpTxt(Math.abs(v)) || '0' : C.formatWon(Math.abs(v))); }
-    function cmpVal(v, k) { return k === 'smp' ? smpTxt(v) : C.formatWon(v); }
+    function cmpVal(v, k) { return k === 'smp' ? smpTxt(v) : (v < 0 ? '−' + C.formatWon(-v) : C.formatWon(v)); }   // 음수 기호를 증감 칸과 같은 「−」로
     function cmpPct(p) { return p == null ? '-' : (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p) + '%'; }
     function cmpNotes(D) {
       var w = function (v) { return C.formatWon(v) + '원'; }, R = {}; D.rows.forEach(function (r) { R[r.key] = r; });
@@ -4496,8 +4507,8 @@ body{
       });
       h += '</table><button type="button" class="cv-add no-print" id="cvAdd">＋ 사람 추가</button>' +
         '<div class="cv-h">3) 주식에 관한 사항</div>' +
-        '<div class="cv-line">① 회사가 발행한 주식의 총수 : ' + c.shares + '주</div><div class="cv-line">② 1 주의 금액 : 일천원</div><div class="cv-line">③ 발행한 주식의 종류와 수</div>' +
-        '<table class="grid cv-tbl"><tr><th>주식의종류</th><th>주 식 수</th><th>금  액</th><th>구 성 비</th><th>비 고</th></tr>' +
+        '<div class="cv-line">① 회사가 발행한 주식의 총수 : ' + c.shares + '주</div><div class="cv-line">② 1주의 금액 : 1,000원(일천 원)</div><div class="cv-line">③ 발행한 주식의 종류와 수</div>' +
+        '<table class="grid cv-tbl"><tr><th>주식의 종류</th><th>주 식 수</th><th>금  액</th><th>구 성 비</th><th>비 고</th></tr>' +
         '<tr><td class="center">보 통 주</td><td class="center">' + c.shares + '주</td><td class="center">' + C.formatWon(amt) + '원</td><td class="center">100%</td><td></td></tr>' +
         '<tr><td class="center">합   계</td><td class="center">' + c.shares + '주</td><td class="center">' + C.formatWon(amt) + '원</td><td class="center">100%</td><td></td></tr></table>';
       box.innerHTML = h;
@@ -4532,8 +4543,8 @@ body{
       // 표 두 개를 세로로 늘려 A4 한 장을 채움 (표 줄 수에 맞춰 줄 높이 자동 계산, 약 11.8mm)
       var RH = Math.max(2000, Math.min(4000, Math.floor(47000 / (rows.length + 3))));
       out += tableXml(rows, [10000, 10000, 30000], RH) + paraXml('', B13, 'C');
-      out += paraXml('3) 주식에 관한 사항', H13, 'L') + paraXml('① 회사가 발행한 주식의 총수 : ' + c.shares + '주', B13, 'L') + paraXml('② 1 주의 금액 : 일천원', B13, 'L') + paraXml('③ 발행한 주식의 종류와 수', B13, 'L');
-      out += tableXml([['주식의종류', '주 식 수', '금   액', '구 성 비', '비고'].map(function (t) { return { t: t, ch: H13, bf: HEAD }; }),
+      out += paraXml('3) 주식에 관한 사항', H13, 'L') + paraXml('① 회사가 발행한 주식의 총수 : ' + c.shares + '주', B13, 'L') + paraXml('② 1주의 금액 : 1,000원(일천 원)', B13, 'L') + paraXml('③ 발행한 주식의 종류와 수', B13, 'L');
+      out += tableXml([['주식의 종류', '주 식 수', '금   액', '구 성 비', '비고'].map(function (t) { return { t: t, ch: H13, bf: HEAD }; }),
                        [{ t: '보 통 주', ch: H13, bf: HEAD }, { t: c.shares + '주', ch: B13 }, { t: C.formatWon(amt) + '원', ch: B13 }, { t: '100%', ch: B13 }, { t: '', ch: B13 }],
                        [{ t: '합   계', ch: H13, bf: HEAD }, { t: c.shares + '주', ch: H13, bf: HEAD }, { t: C.formatWon(amt) + '원', ch: H13, bf: HEAD }, { t: '100%', ch: H13, bf: HEAD }, { t: '', bf: HEAD }]], [10000, 10000, 12000, 10000, 8000], RH);
       return out;
@@ -4684,7 +4695,7 @@ body{
     function renderResol() {
       var box = $('resolBox'); if (!box) return;
       var c = cover(), h = '<div class="rs-title">이 사 회 결 의 서</div>' +
-        '<div class="rs-lead">이사회의 의결로서 이와 같이 (' + year + '.01.01 ~ ' + year + '.12.31)<br>결산 보고서를 제출합니다.</div>';
+        '<div class="rs-lead">이사회의 의결로써 이와 같이 (' + perDots(year) + ')<br>결산 보고서를 제출합니다.</div>';
       c.members.filter(function (m) { return m[0] || m[1]; }).forEach(function (m) {
         var adr = String(m[2] || '').trim(); if (adr && !/^전라남도/.test(adr)) adr = '전라남도 영광군 ' + adr;
         h += '<div class="rs-m"><div class="r">' + esc(String(m[0] || '').replace(/\s+/g, '')) + ' :</div><div class="n">' + esc(String(m[1] || '').replace(/\s+/g, '')) + '</div><div class="s">(인)</div><div class="a">' + esc(adr) + '</div></div>';
@@ -4994,8 +5005,16 @@ body{
       c._breaks = breaks;
       return c;
     }
-    function docImages(blocks) {   // 13pt 고정, 한 화면(1 : 1.95)을 넘으면 줄 사이에서 나눔, 여러 장이면 ( n / N )
+    function docImages(blocks, fill) {   // 13pt 고정, 한 화면(1 : 1.95)을 넘으면 줄 사이에서 나눔, 여러 장이면 ( n / N )
       var W = 1080, TARGET = Math.round(W * 1.95), FOOT = 70, TOP = 30, PX = Math.round(1080 / 187 * 13 * 0.3528), parts = [];
+      if (fill) {   // 위임장·소집통지서: 장마다 글자를 키워 휴대폰 한 화면(1 : 1.95)을 꽉 채움 → 위는 카메라 구멍 바로 아래부터
+        return docPages(blocks).map(function (pg) {
+          var lo = PX, hi = PX * 2.4, best = drawDocAt(pg, PX);
+          for (var it = 0; it < 9; it++) { var mid = (lo + hi) / 2, cv = drawDocAt(pg, Math.round(mid)); if (cv.height <= TARGET - 20) { best = cv; lo = mid; } else hi = mid; }
+          var o = document.createElement('canvas'); o.width = W; o.height = Math.max(TARGET, best.height); var g = o.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, o.height);
+          g.drawImage(best, 0, Math.max(0, Math.round((TARGET - best.height) / 2))); return o;
+        });
+      }
       docPages(blocks).forEach(function (pg, pi) {
         if (pg[0].k === 'cover') {   // 표지: 결산서 표지와 같은 그림을 한 화면에
           var tp = drawTitlePage(pg[0]), cc = document.createElement('canvas'); cc.width = W; cc.height = TARGET - FOOT;
@@ -5166,7 +5185,7 @@ body{
       var t = e.target, id = t.getAttribute && (t.getAttribute('data-docpng') || t.getAttribute('data-dochwp')); if (!id || !DOC_DEF[id]) return;
       var D = DOC_DEF[id], msg = document.getElementById('docMsg-' + id);
       try {
-        if (t.getAttribute('data-docpng')) shareCanvases(docImages(D.blocks()), D.name() + '.png', D.title, msg);
+        if (t.getAttribute('data-docpng')) shareCanvases(docImages(D.blocks(), D.fill), D.name() + '.png', D.title, msg);
         else saveDocHwpx(D.blocks, D.name() + '.hwpx', msg);
       } catch (err) { if (msg) msg.textContent = '⚠ 만들지 못했습니다: ' + err.message; }
     });
@@ -5264,7 +5283,7 @@ body{
         b('○ 소집 통지는 정관 제17조 제1항에 따라 총회일 10일 전까지 각 주주에게 서면(또는 동의한 주주에게 전자문서)으로 발송하기로 함.', 2);
       } else if (/결산|재무제표|영업보고/.test(t)) {
         var O = fsOfficial(X.N.Y - (X.N.M <= 3 ? 1 : 0)) || fsOfficial(year), sm = C.summarize(db, year);
-        b('○ 정관 제39조 제1항 및 제34조 제2호에 따라 제' + gi + '기(' + year + '.01.01 ~ ' + year + '.12.31) 재무제표(재무상태표·손익계산서·이익잉여금처분계산서)와 영업보고서를 이사회에 제출하고 그 내용을 설명함.', 2);
+        b('○ 정관 제39조 제1항 및 제34조 제2호에 따라 제' + gi + '기(' + perDots(year) + ') 재무제표(재무상태표·손익계산서·이익잉여금처분계산서)와 영업보고서를 이사회에 제출하고 그 내용을 설명함.', 2);
         b('- 매출(입금)액 : ' + w(sm.totalIncome) + '원, 지출액 : ' + w(sm.totalExpense) + '원', 3);
         if (O) b('- 당기순이익 : ' + w(O.meta.ni) + '원, 차기이월 미처분이익잉여금 : ' + w(O.meta.re) + '원 (배당 없음)', 3);
         b('- 통장 잔액 : ' + w(sm.balance) + '원', 3);
@@ -5451,6 +5470,285 @@ body{
       box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) renderBoard(); }, 0); });
     })();
 
+    /* ══════════════════ 공문 (보내 주신 「공문 양식」 그대로: 로고 · 주소 줄 · 문서번호~제목 · 본문 · 붙임 · 발신 명의 + 직인) ══════════════════
+       사진·PDF로 저장. 붙임 파일(사진·PDF)은 공문 뒤에 이어 붙임. 붙임 파일은 이 기기(IndexedDB)에만 보관 */
+    var GM_LOGO = 'data:image/png;base64,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';
+    var gmLogoEl = new Image(); gmLogoEl.src = GM_LOGO;
+    var GM_DEF = { addr: '(57024)전라남도 영광군 백수읍 백수로 224', tel: '', fax: '(061)353-5558', from: '염전마을주민발전(주) 대표이사', co: '염 전 마 을 주 민 발 전(주)', ceo: '대 표 이 사   김    진    욱' };
+    function gmToday() { var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+    function gmNew() { return { id: String(Date.now()), date: gmToday(), no: '', to: '', title: '', greet: '', body: '', attach: [] }; }
+    function gmData() {
+      if (!db.gongmun) db.gongmun = { list: [], cur: 0, cfg: {} };
+      var G = db.gongmun; if (!G.cfg) G.cfg = {}; if (!G.list || !G.list.length) G.list = [gmNew()];
+      if (!(G.cur >= 0 && G.cur < G.list.length)) G.cur = G.list.length - 1;
+      return G;
+    }
+    function gmCfg(k) { var c = gmData().cfg; return c[k] != null && String(c[k]).trim() !== '' ? c[k] : GM_DEF[k]; }
+    function gmDoc() { var G = gmData(); return G.list[G.cur]; }
+    function gmNo(d) {   // 문서번호 자동: 염전 제(시행일자)-(그날 몇 번째)호
+      if (String(d.no || '').trim()) return d.no;
+      var ymd = String(d.date || '').replace(/-/g, ''), same = gmData().list.filter(function (x) { return x.date === d.date; }), i = same.map(function (x) { return x.id; }).indexOf(d.id);
+      return '염전 제' + ymd + '-' + pad(Math.max(1, i + 1)) + '호';
+    }
+    function gmDateTxt(v) { var m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[1] + '. ' + (+m[2]) + '. ' + (+m[3]) + '.' : ''; }   // 공문서 날짜: 2026. 1. 23.
+    function gmGreet(d) {   // 인사말 자동: 수신에 다른 시·군 이름이 있으면 그곳, 영광군(과·팀·TF 포함)이면 영광군, 그 밖은 귀 기관
+      if (String(d.greet || '').trim()) return d.greet;
+      var to = String(d.to || ''), m = to.match(/([가-힣]{1,4}(?:특별시|광역시|시|군|도))(?![가-힣])/), who = '귀 기관';
+      if (m && !/영광/.test(m[1])) who = m[1]; else if (/영광|군청|군수|[과팀]$|TF|읍|면/.test(to)) who = '영광군';
+      return '염전마을 주민발전주식회사는 ' + who + '의 무궁한 발전을 기원합니다.';
+    }
+    // 본문 항목 (행정업무운영 편람): 1. → 가. → 1) → 가) → (1) → (가) → ① → ㉮
+    // 하위 항목은 상위 항목보다 2타(한 글자)씩 오른쪽, 기호 뒤 1타, 둘째 줄부터는 항목 내용 첫 글자에 맞춤.
+    // □ ○ - · ◦ 같은 특수기호는 바로 위 항목의 한 단계 아래로 봄
+    function gmLines(d) {
+      var L = String(d.body || '').replace(/\r/g, '').split('\n').map(function (t) { return t.replace(/\s+$/, ''); });
+      while (L.length && !L[L.length - 1].trim()) L.pop();
+      var PAT = [/^(\d{1,2}\.)(?!\d)\s*/, /^([가-하]\.)\s*/, /^(\d{1,2}\))\s*/, /^([가-하]\))\s*/, /^(\(\d{1,2}\))\s*/, /^(\([가-하]\))\s*/, /^([①-⑳])\s*/, /^([㉮-㉻])\s*/], last = -1;
+      var out = L.map(function (t) {
+        var s = t.replace(/^\s+/, ''), m;
+        for (var i = 0; i < PAT.length; i++) if ((m = s.match(PAT[i]))) { last = i; return { lv: i, mk: m[1], t: s.slice(m[0].length) }; }
+        if ((m = s.match(/^([□○◦·※■●-])\s+/))) return { lv: Math.min(7, last + 1), mk: m[1], t: s.slice(m[0].length) };
+        return { lv: -1, mk: '', t: s };
+      });
+      var at = (d.attach || []).filter(function (a) { return String(a.name || '').trim(); });
+      if (!at.length && out.length) { var last = out[out.length - 1]; if (!/끝\.?$/.test(last.t)) last.t += '  끝.'; }   // 붙임이 없으면 본문 끝에 「끝.」
+      return out;
+    }
+    // 붙임 (편람): 「붙임」 뒤 2타, 쌍점 없음. 1개면 「붙임  ○○ 1부.  끝.」, 여러 개면 「붙임  1. ○○ 1부.」 다음 줄부터 번호를 맞춰 쓰고 마지막에 「  끝.」
+    function gmAttachLines(d) {
+      var at = (d.attach || []).filter(function (a) { return String(a.name || '').trim(); });
+      if (!at.length) return [];
+      var cp = function (a) { return ' ' + (Math.max(1, +a.copies || 1)) + '부.'; };
+      if (at.length === 1) return [at[0].name.trim() + cp(at[0]) + '  끝.'];
+      return at.map(function (a, i) { return (i + 1) + '. ' + a.name.trim() + cp(a) + (i === at.length - 1 ? '  끝.' : ''); });
+    }
+    // A4 한 장 = 1654 × 2339 (200dpi). 위치는 보내 주신 양식에서 잰 mm 값
+    // opt 없음 = A4 (1654 × 2339, 200dpi, PDF용) · opt.phone = 휴대폰 화면 비율(1 : 1.95) 사진용: 글자를 키워 한 화면을 채움
+    function gmPages(opt) {
+      if (opt && opt.phone) {   // 한 장에 들어가는 가장 큰 글자로 (넘치면 1배로 여러 장)
+        for (var fs = 1.6; fs >= 1.0001; fs -= 0.05) { var r = gmPagesAt(1080, 210 / fs, 1.95); if (r.length === 1) return r; }
+        return gmPagesAt(1080, 210, 1.95);
+      }
+      return gmPagesAt(1654, 210, 297 / 210);
+    }
+    function gmPagesAt(W, PW, RATIO) {
+      var d = gmDoc(), PH = PW * RATIO, H = Math.round(W * RATIO), k = W / PW, NAVY = '#1f3a68', F = DOC_FONT, pages = [];
+      var c, g, y, R = PW - 9;
+      function mm(v) { return Math.round(v * k); }
+      function font(pt, wt) { return (wt || 400) + ' ' + Math.round(pt * 0.3528 * k) + 'px ' + F; }
+      function newPage(first) {
+        c = document.createElement('canvas'); c.width = W; c.height = H; g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.textBaseline = 'middle'; pages.push(c);
+        if (!first) { y = 20; return; }
+        var lw = PW - 32.5, lh = lw * 35 / 177.5;
+        if (gmLogoEl.complete && gmLogoEl.naturalWidth) g.drawImage(gmLogoEl, mm(15.3), mm(7.6), mm(lw), mm(lh));
+        var ay = 7.6 + lh - 0.2, tel = gmCfg('tel'), a1 = '주소:' + gmCfg('addr'), a2 = tel ? '전화: ' + tel : '', a3 = '팩스:' + gmCfg('fax');
+        g.font = font(10.5, 700); g.fillStyle = '#111';
+        var wAll = g.measureText(a1 + a2 + a3).width + mm(16);
+        if (wAll <= mm(R - 9)) {   // 한 줄: 주소(왼쪽) · 전화(가운데) · 팩스(오른쪽)
+          g.textAlign = 'left'; g.fillText(a1, mm(9), mm(ay));
+          if (a2) { g.textAlign = 'center'; g.fillText(a2, mm(PW * 0.595), mm(ay)); }
+          g.textAlign = 'right'; g.fillText(a3, mm(R), mm(ay));
+        } else {   // 좁으면 두 줄
+          g.textAlign = 'left'; g.fillText(a1, mm(9), mm(ay - 2.6));
+          g.textAlign = 'right'; g.fillText((a2 ? a2 + '   ' : '') + a3, mm(R), mm(ay + 2.6)); ay += 2.6;
+        }
+        g.textAlign = 'left';
+        g.fillStyle = NAVY; g.fillRect(mm(9), mm(ay + 2.7), mm(R - 9), mm(0.6));
+        [['문서번호', gmNo(d)], ['시행일자', gmDateTxt(d.date)], ['발신', gmCfg('from')], ['수신', d.to || ''], ['제목', d.title || '']].forEach(function (rw, i) {
+          var yy = mm(ay + 6.6 + i * 6.05); g.font = font(10.5, 700); g.fillStyle = '#111';
+          if (rw[0].length === 2) { g.fillText(rw[0].charAt(0), mm(9), yy); g.fillText(rw[0].charAt(1), mm(20.5), yy); } else g.fillText(rw[0], mm(9), yy);
+          g.fillText(':', mm(25.3), yy); g.fillText(rw[1], mm(28), yy);
+        });
+        g.fillStyle = NAVY; g.fillRect(mm(9), mm(ay + 35.2), mm(R - 9), mm(1));
+        y = ay + 43.6;
+      }
+      function wrap(t, maxW) {
+        var out = [], line = '';
+        String(t).split('').forEach(function (ch) {
+          if (g.measureText(line + ch).width > maxW && line) { var cut = line.lastIndexOf(' '); if (cut > line.length * 0.6) { out.push(line.slice(0, cut)); line = line.slice(cut + 1) + ch; } else { out.push(line); line = ch; } }
+          else line += ch;
+        });
+        out.push(line); return out.map(function (l, i) { return i ? l.replace(/^\s+/, '') : l; });
+      }
+      var LH = 6.25, BOTTOM_LAST = PH - 54, BOTTOM = PH - 17;
+      newPage(true);
+      g.font = font(11); g.fillStyle = '#111';
+      wrap(gmGreet(d), mm(R - 11)).forEach(function (w) { g.fillText(w, mm(11), mm(y)); y += LH; }); y += LH * 0.6;
+      var lines = gmLines(d), att = gmAttachLines(d);
+      lines.forEach(function (ln, idx) {
+        g.font = font(11); var ta2 = g.measureText('가').width / k, x0 = 11 + Math.max(0, ln.lv) * ta2, mk = ln.mk ? ln.mk + ' ' : '', hang = mk ? g.measureText(mk).width / k : 0;   // 한 단계 = 2타(한 글자)
+        if (ln.lv === 0 && idx > 0) y += 1.2;   // 큰 번호 앞은 조금 띄움
+        if (!ln.t && !mk) { y += LH * 0.6; return; }
+        wrap(ln.t, mm(R - x0) - mm(hang)).forEach(function (w, i) {
+          if (y > BOTTOM - 8) newPage(false);
+          g.font = font(11); g.fillStyle = '#111';
+          if (i === 0 && mk) g.fillText(mk, mm(x0), mm(y));
+          g.fillText(w, mm(x0) + mm(hang), mm(y)); y += LH;
+        });
+      });
+      // 붙임 + 발신 명의는 마지막 장 아래쪽에 함께 (자리가 모자라면 새 장)
+      g.font = font(11); var labW = g.measureText('붙임  ').width / k, attW = [];   // [{t, x}] 「붙임」 다음 2타에서 시작, 여러 개면 번호 다음 글자에 맞춰 줄바꿈
+      att.forEach(function (t) { var mm2 = t.match(/^(\d+\.\s)/), hg = mm2 ? g.measureText(mm2[1]).width / k : 0; wrap(t, mm(R - 11 - labW) - mm(hg)).forEach(function (w, i) { attW.push({ t: w, x: 11 + labW + (i ? hg : 0) }); }); });
+      var need = (attW.length ? attW.length * LH + LH : 0);
+      if (y + need > BOTTOM_LAST) newPage(false);
+      if (attW.length) { y = Math.max(y + LH * 1.4, BOTTOM_LAST - need + LH); g.font = font(11); g.fillStyle = '#111'; g.fillText('붙임', mm(11), mm(y)); attW.forEach(function (r) { g.fillText(r.t, mm(r.x), mm(y)); y += LH; }); }
+      // 발신 명의 (크게·굵게·남색 그림자) + 직인 + 회색 띠 — 좁은 화면이면 글자를 줄여 한 줄에
+      var SY = PH - 24.4, co = gmCfg('co'), ceo = gmCfg('ceo'), sp = 14, pt = 17;
+      g.font = font(pt, 900); var wco = g.measureText(co).width, wceo = g.measureText(ceo).width;
+      if (wco + wceo + mm(sp) > mm(PW - 16)) { var sc = mm(PW - 16) / (wco + wceo + mm(sp)); pt *= sc; sp *= sc; g.font = font(pt, 900); wco = g.measureText(co).width; wceo = g.measureText(ceo).width; }
+      var x = (W - wco - mm(sp) - wceo) / 2;
+      [[mm(0.5), '#b8b8b8'], [0, NAVY]].forEach(function (s) { g.fillStyle = s[1]; g.fillText(co, x + s[0], mm(SY) + s[0]); g.fillText(ceo, x + wco + mm(sp) + s[0], mm(SY) + s[0]); });
+      if (sealImgEl.complete && sealImgEl.naturalWidth) { var sx = x + wco + mm(sp) + wceo, sw = mm(22 * pt / 17); g.globalCompositeOperation = 'multiply'; g.drawImage(sealImgEl, sx - sw * 0.64, mm(SY) - sw / 2, sw, sw); g.globalCompositeOperation = 'source-over'; }
+      g.fillStyle = '#9a9a9a'; g.fillRect(mm(10), mm(PH - 16.3), mm(PW - 24), mm(1.5));
+      return pages;
+    }
+    /* 붙임 파일: 사진은 그대로, PDF는 쪽마다 그림으로 바꿔서 보관 (IndexedDB, 이 기기에만) */
+    var gmImgs = {};   // key → [Image]
+    function gmIdb(mode, fn) {
+      return new Promise(function (ok, no) {
+        try {
+          var rq = indexedDB.open('yeomjeon-gongmun', 1);
+          rq.onupgradeneeded = function () { rq.result.createObjectStore('files'); };
+          rq.onsuccess = function () { var tx = rq.result.transaction('files', mode), st = tx.objectStore('files'), r = fn(st); tx.oncomplete = function () { ok(r && r.result); }; tx.onerror = function () { no(tx.error); }; };
+          rq.onerror = function () { no(rq.error); };
+        } catch (e) { no(e); }
+      });
+    }
+    function gmLoadImgs(key) {
+      if (gmImgs[key]) return Promise.resolve(gmImgs[key]);
+      return gmIdb('readonly', function (st) { return st.get(key); }).then(function (urls) {
+        return Promise.all((urls || []).map(function (u) { return new Promise(function (ok) { var im = new Image(); im.onload = function () { ok(im); }; im.onerror = function () { ok(null); }; im.src = u; }); }));
+      }).then(function (ims) { gmImgs[key] = ims.filter(Boolean); return gmImgs[key]; }).catch(function () { return []; });
+    }
+    function gmFitJpeg(src, w, h) {   // A4 안에 맞춰 최대 1654 × 2339, JPEG
+      var s = Math.min(1, 1654 / w, 2339 / h), c = document.createElement('canvas'); c.width = Math.round(w * s); c.height = Math.round(h * s);
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85);
+    }
+    var gmPdfJs = null;
+    function gmLoadPdfJs() {
+      if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+      if (gmPdfJs) return gmPdfJs;
+      gmPdfJs = new Promise(function (ok, no) {
+        var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        s.onload = function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; ok(window.pdfjsLib); };
+        s.onerror = function () { gmPdfJs = null; no(new Error('PDF 도구를 불러오지 못했습니다(인터넷 연결 확인)')); }; document.head.appendChild(s);
+      });
+      return gmPdfJs;
+    }
+    function gmFileToUrls(f) {
+      if (/pdf$/i.test(f.type) || /\.pdf$/i.test(f.name)) {
+        return Promise.all([gmLoadPdfJs(), f.arrayBuffer()]).then(function (r) { return r[0].getDocument({ data: r[1] }).promise; }).then(function (pdf) {
+          var urls = [], chain = Promise.resolve();
+          for (var i = 1; i <= Math.min(pdf.numPages, 30); i++) (function (i) {
+            chain = chain.then(function () { return pdf.getPage(i); }).then(function (pg) {
+              var v0 = pg.getViewport({ scale: 1 }), v = pg.getViewport({ scale: 1654 / v0.width }), c = document.createElement('canvas'); c.width = Math.round(v.width); c.height = Math.round(v.height);
+              var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+              return pg.render({ canvasContext: g, viewport: v }).promise.then(function () { urls.push(gmFitJpeg(c, c.width, c.height)); });
+            });
+          })(i);
+          return chain.then(function () { return urls; });
+        });
+      }
+      return new Promise(function (ok, no) {
+        var rd = new FileReader();
+        rd.onload = function () { var im = new Image(); im.onload = function () { ok([gmFitJpeg(im, im.naturalWidth, im.naturalHeight)]); }; im.onerror = function () { no(new Error('그림 파일을 읽지 못했습니다')); }; im.src = rd.result; };
+        rd.onerror = function () { no(rd.error); }; rd.readAsDataURL(f);
+      });
+    }
+    function gmAllCanvases() {   // 공문 + 붙임 파일 쪽들
+      var d = gmDoc(), list = gmPages({ phone: true });   // 사진: 휴대폰 화면 비율로 글자를 키워 한 화면에
+      return Promise.all((d.attach || []).map(function (a) { return a.key ? gmLoadImgs(a.key) : Promise.resolve([]); })).then(function (sets) {
+        sets.forEach(function (ims) { ims.forEach(function (im) {   // 붙임 쪽도 휴대폰 화면 비율(1 : 1.95) 안에 가운데로
+          var c = document.createElement('canvas'), W = 1080, H = Math.round(W * 1.95), sc = Math.min(W / im.naturalWidth, H / im.naturalHeight), w = im.naturalWidth * sc, h = im.naturalHeight * sc; c.width = W; c.height = H;
+          var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(im, (W - w) / 2, (H - h) / 2, w, h); list.push(c);
+        }); });
+        return list;
+      });
+    }
+    function gmName() { var d = gmDoc(); return '공문_' + String(d.date || '').replace(/-/g, '') + (d.title ? '_' + String(d.title).replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30) : ''); }
+    var gmTimer = null;
+    function gmPreviewSoon() { clearTimeout(gmTimer); gmTimer = setTimeout(gmPaint, 300); }
+    var gmPrintHtml = '';   // PDF용: 공문 쪽 + 붙임 쪽 (미리 만들어 둬서 버튼을 누르면 바로 인쇄 창)
+    function gmPaint() {
+      var box = $('gmPrev'); if (!box) return;
+      try {
+        var pg = gmPages().map(function (c) { return c.toDataURL('image/png'); }), d = gmDoc(), wait = false, att = [];
+        (d.attach || []).forEach(function (a) { if (!a.key) return; if (gmImgs[a.key]) gmImgs[a.key].forEach(function (im) { att.push(im.src); }); else { wait = true; gmLoadImgs(a.key).then(function () { gmPaint(); }); } });
+        box.innerHTML = pg.map(function (u) { return '<img class="gm-pg" alt="공문 미리보기" src="' + u + '">'; }).join('') + (att.length ? '<p class="bz-hint">붙임 ' + att.length + '쪽이 공문 뒤에 이어 붙습니다.</p>' : '');
+        gmPrintHtml = pg.concat(att).map(function (u) { return '<img class="gm-pg" alt="" src="' + u + '">'; }).join('');
+        if (wait) gmPrintHtml = '';
+      } catch (e) { box.textContent = '⚠ ' + e.message; }
+    }
+    function renderGongmun() {
+      var box = $('gmBox'); if (!box || box.contains(document.activeElement)) return;
+      var G = gmData(), d = gmDoc(), inp = function (k, ph, cls, type) { return '<input data-gm="' + k + '"' + (type ? ' type="' + type + '"' : '') + ' class="' + (cls || '') + '" placeholder="' + esc(ph || '') + '" value="' + esc(d[k] == null ? '' : d[k]) + '">'; };
+      var cfg = function (k, ph) { return '<label>' + ph + ' <input data-gmc="' + k + '" class="w" placeholder="' + esc(GM_DEF[k] || '') + '" value="' + esc(G.cfg[k] || '') + '"></label><br>'; };
+      var h = '<div class="cv-title">공 &nbsp; 문</div>' +
+        '<p class="bz-hint no-print">보내 주신 공문 양식(로고·주소 줄·문서번호~제목·발신 명의·직인) 그대로 만듭니다. 문서번호·시행일자·인사말·「끝.」·붙임 줄·직인은 자동으로 들어가고, 본문은 「1.」 「가.」 「1)」 「가)」로 시작하면 자동으로 들여씁니다. 붙임 파일(사진·PDF)은 공문 뒤에 이어 붙어 저장됩니다.</p>' +
+        '<div class="no-print">' +
+        '<p>공문 <select id="gmSel">' + G.list.map(function (x, i) { return '<option value="' + i + '"' + (i === G.cur ? ' selected' : '') + '>' + esc(gmDateTxt(x.date) + ' ' + (x.title || '(제목 없음)')) + '</option>'; }).join('') + '</select> ' +
+        '<button type="button" class="cv-add" id="gmNew" style="display:inline-block">＋ 새 공문</button> <button type="button" class="cv-del" id="gmDel" style="width:auto;padding:0 8px">이 공문 지우기</button></p>' +
+        '<p>시행일자 ' + inp('date', '', '', 'date') + ' · 문서번호 ' + inp('no', gmNo(Object.assign({}, d, { no: '' })), 'w') + '</p>' +
+        '<p>수신 ' + inp('to', '예: 영광군수(기본소득 상생 TF과)', 'w') + '</p>' +
+        '<p>제목 ' + inp('title', '예: REC 관련하여 본사의 입장', 'w') + '</p>' +
+        '<p>인사말 ' + inp('greet', gmGreet(Object.assign({}, d, { greet: '' })), 'w') + ' <span class="bz-hint">비우면 수신에 맞춰 자동</span></p>' +
+        '<p>본문 <span class="bz-hint">(한 줄에 한 항목 · 1. → 가. → 1) → 가) → (1) → (가) → ① → ㉮ 순서로 쓰면 공문서 규칙대로 두 칸씩 들여쓰고 둘째 줄을 맞춥니다)</span></p><textarea class="cv-purpose" data-gm="body" rows="14" placeholder="1. 본 건의 개요&#10;가. 본 건은 …&#10;2. 요청 사항&#10;가. …">' + esc(d.body || '') + '</textarea>' +
+        '<p><b>붙임 파일</b> <label class="cv-add" style="display:inline-block;margin:0">📎 사진·PDF 붙이기<input type="file" id="gmFile" accept="image/*,application/pdf,.pdf" multiple hidden></label> <span class="bz-hint" id="gmFileMsg">붙인 파일은 이 기기에만 보관되고 공문 뒤에 이어 붙어 저장됩니다.</span></p>' +
+        (d.attach || []).map(function (a, i) { return '<p style="margin-left:1em">' + (i + 1) + '. <input data-gma="' + i + '" data-f="name" class="w" value="' + esc(a.name || '') + '" placeholder="붙임 이름"> <input data-gma="' + i + '" data-f="copies" value="' + esc(a.copies || 1) + '" style="width:3em" inputmode="numeric">부 ' + (a.key ? '<span class="bz-hint">' + (a.pages || 0) + '쪽 붙음</span>' : '<span class="bz-hint">(파일 없이 이름만)</span>') + ' <button type="button" class="cv-del" data-gmadel="' + i + '">－</button></p>'; }).join('') +
+        '<p style="margin-left:1em"><button type="button" class="cv-add" id="gmAttName" style="display:inline-block">＋ 파일 없이 붙임 이름만 추가</button></p>' +
+        '<details><summary>회사 정보 (주소·전화·팩스·발신 명의 — 한 번 적으면 이 기기에 기억)</summary>' + cfg('addr', '주소') + cfg('tel', '전화') + cfg('fax', '팩스') + cfg('from', '발신') + cfg('co', '회사 이름 줄') + cfg('ceo', '대표 이름 줄') + '</details>' +
+        '<p><button type="button" class="cv-add" id="gmPng" style="display:inline-block">📷 사진으로 저장</button> <button type="button" class="cv-add" data-pdf="gongmun" style="display:inline-block">📄 PDF로 저장</button> <span class="bz-hint" id="gmMsg"></span></p>' +
+        '</div><div id="gmPrev" class="gm-prev"></div>';
+      box.innerHTML = h; gmPaint();
+    }
+    (function () {
+      var box = $('gmBox'); if (!box) return;
+      box.addEventListener('input', function (e) {
+        var el = e.target, d = gmDoc(), k = el.getAttribute('data-gm'), c = el.getAttribute('data-gmc'), a = el.getAttribute('data-gma');
+        if (k) { d[k] = el.value; saveSoon(); gmPreviewSoon(); return; }
+        if (c) { gmData().cfg[c] = el.value; saveSoon(); gmPreviewSoon(); return; }
+        if (a != null) { var f = el.getAttribute('data-f'); d.attach[+a][f] = f === 'copies' ? Math.max(1, parseInt(el.value, 10) || 1) : el.value; saveSoon(); gmPreviewSoon(); }
+      });
+      box.addEventListener('change', function (e) {
+        var el = e.target, G = gmData();
+        if (el.id === 'gmSel') { G.cur = +el.value; save(); el.blur(); renderGongmun(); return; }
+        if (el.id === 'gmFile') {
+          var fs = Array.prototype.slice.call(el.files || []), d = gmDoc(), msg = $('gmFileMsg'); el.value = ''; if (!fs.length) return;
+          if (msg) msg.textContent = '붙임 파일을 넣는 중…';
+          fs.reduce(function (p, f) {
+            return p.then(function () { return gmFileToUrls(f); }).then(function (urls) {
+              var key = d.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+              return gmIdb('readwrite', function (st) { return st.put(urls, key); }).then(function () {
+                delete gmImgs[key]; d.attach = d.attach || []; d.attach.push({ name: f.name.replace(/\.[^.]+$/, ''), copies: 1, key: key, pages: urls.length }); save();
+              });
+            });
+          }, Promise.resolve()).then(function () { if (msg) msg.textContent = '✔ 붙임 파일을 넣었습니다.'; renderGongmun(); })
+            .catch(function (err) { var m2 = $('gmFileMsg'); renderGongmun(); m2 = $('gmFileMsg'); if (m2) m2.textContent = '⚠ ' + (err && err.message || err); });
+          return;
+        }
+        if (el.getAttribute('data-gm') === 'date') { el.blur(); renderGongmun(); }
+      });
+      box.addEventListener('click', function (e) {
+        var t = e.target, G = gmData(), d = gmDoc();
+        if (t.tagName === 'BUTTON' && t.id !== 'gmPng') t.blur();   // 버튼에 초점이 남아 있으면 화면을 다시 그리지 않으므로 먼저 풀어 줌
+        if (t.id === 'gmNew') { G.list.push(gmNew()); G.cur = G.list.length - 1; save(); renderGongmun(); return; }
+        if (t.id === 'gmDel') {
+          if (!window.confirm('이 공문을 지울까요? (붙임 파일도 함께 지워집니다)')) return;
+          (d.attach || []).forEach(function (a) { if (a.key) gmIdb('readwrite', function (st) { return st.delete(a.key); }).catch(function () { }); });
+          G.list.splice(G.cur, 1); G.cur = Math.max(0, G.cur - 1); save(); renderGongmun(); return;
+        }
+        if (t.id === 'gmAttName') { d.attach = d.attach || []; d.attach.push({ name: '', copies: 1 }); save(); renderGongmun(); var q = box.querySelectorAll('input[data-gma][data-f="name"]'); if (q.length) q[q.length - 1].focus(); return; }
+        var del = t.getAttribute('data-gmadel');
+        if (del != null) { var a = d.attach[+del]; if (a && a.key) gmIdb('readwrite', function (st) { return st.delete(a.key); }).catch(function () { }); d.attach.splice(+del, 1); save(); renderGongmun(); return; }
+        if (t.id === 'gmPng') {
+          var msg = $('gmMsg'); if (msg) msg.textContent = '사진을 만드는 중…';
+          gmAllCanvases().then(function (list) { shareCanvases(list, gmName() + '.png', '공문', msg); }).catch(function (err) { if (msg) msg.textContent = '⚠ 사진을 만들지 못했습니다: ' + err.message; });
+        }
+      });
+      box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) renderGongmun(); }, 0); });
+      gmLogoEl.onload = function () { try { gmPaint(); } catch (e) { } };
+    })();
+
     /* ══════════════════ ② 정기주주총회 소집통지서 (정관 제16조·제17조, 상법 제363조) ══════════════════
        일시·장소·안건은 정기주주총회 의사록에서 그대로 가져옴. 총회일 10일 전까지 발송(정관 제17조 제1항) */
     function noticeData() { if (!db.notice) db.notice = { sent: '' }; return db.notice; }
@@ -5490,7 +5788,7 @@ body{
         '<p class="no-print">발송일 <input type="date" id="ntSent" value="' + esc(Nd.sent || '') + '"> ' + warn + '</p>' +
         docButtons('notice') + docPreview(noticeBlocks());
     }
-    DOC_DEF.notice = { title: '정기주주총회 소집 통지서', blocks: noticeBlocks, name: function () { var O = fsOfficial(year), gi = O ? O.meta.gi : year - 2018; return '제' + gi + '기_정기주주총회_소집통지서'; } };
+    DOC_DEF.notice = { title: '정기주주총회 소집 통지서', fill: true, blocks: noticeBlocks, name: function () { var O = fsOfficial(year), gi = O ? O.meta.gi : year - 2018; return '제' + gi + '기_정기주주총회_소집통지서'; } };
     (function () {
       var box = $('noticeBox'); if (!box) return;
       box.addEventListener('change', function (e) { if (e.target.id !== 'ntSent') return; noticeData().sent = e.target.value; save(); e.target.blur(); renderNotice(); });
@@ -5576,7 +5874,8 @@ body{
         board: (function () { var B = boardData(); return B.key.slice(0, 4) + '년_' + (+B.key.slice(5, 7)) + '월_이사회_회의록'; })(),
         holders: '주주명부_' + year,
         notice: '제' + gi + '기_정기주주총회_소집통지서',
-        proxy: DOC_DEF.proxy ? DOC_DEF.proxy.name() : '위임장'
+        proxy: DOC_DEF.proxy ? DOC_DEF.proxy.name() : '위임장',
+        gongmun: typeof gmName === 'function' ? gmName() : '공문'
       }[mode];
       if (mode === 'report') {   // 결산서: 가로 920px 보고서를 A4 한 장(186mm × 273mm ≈ 703 × 1030px)에 맞게 줄임
         var wr = document.getElementById('sheetWrap'), Hh = wr ? wr.offsetHeight : 1300;
@@ -5587,9 +5886,10 @@ body{
       else if (mode === 'board') box.innerHTML = docPreview(boardBlocks());
       else if (mode === 'holders') box.innerHTML = holdersPrintHtml();
       else if (mode === 'notice' || mode === 'proxy') box.innerHTML = docPreview(DOC_DEF[mode].blocks());
+      else if (mode === 'gongmun') { if (!gmPrintHtml) gmPaint(); if (!gmPrintHtml) { var gmm = $('gmMsg'); if (gmm) gmm.textContent = '붙임 파일을 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.'; return; } box.innerHTML = gmPrintHtml; }
       else box.innerHTML = '';
       var body = document.body, old = document.title, done = false;
-      ['pm-report', 'pm-annual', 'pm-min', 'pm-board', 'pm-holders', 'pm-notice', 'pm-proxy'].forEach(function (c) { body.classList.remove(c); });
+      ['pm-report', 'pm-annual', 'pm-min', 'pm-board', 'pm-holders', 'pm-notice', 'pm-proxy', 'pm-gongmun'].forEach(function (c) { body.classList.remove(c); });
       body.classList.add('pm-' + mode); document.title = title;
       function clean() { if (done) return; done = true; body.classList.remove('pm-' + mode); document.title = old; }
       window.addEventListener('afterprint', clean, { once: true });
@@ -5597,7 +5897,7 @@ body{
       setTimeout(function () { try { window.print(); } catch (e) { clean(); } setTimeout(clean, 120000); }, 60);   // 2분 뒤에도 표시가 남아 있으면 정리
     }
     document.addEventListener('click', function (e) { var m = e.target.getAttribute && e.target.getAttribute('data-pdf'); if (m) printPdf(m, e.target); });
-    DOC_DEF.proxy = { title: '위임장', blocks: function () { return proxyBlocks(proxyWho()); }, name: function () { var w2 = proxyWho(); return '위임장' + (w2 === '*' ? '_주주전원' : w2 ? '_' + w2 : ''); } };
+    DOC_DEF.proxy = { title: '위임장', fill: true, blocks: function () { return proxyBlocks(proxyWho()); }, name: function () { var w2 = proxyWho(); return '위임장' + (w2 === '*' ? '_주주전원' : w2 ? '_' + w2 : ''); } };
     (function () {
       var box = $('proxyBox'); if (!box) return;
       box.addEventListener('change', function (e) { if (e.target.id !== 'pxWho') return; db.proxyWho = e.target.value; save(); e.target.blur(); renderProxy(); });
@@ -6018,11 +6318,11 @@ body{
           '6. 출석 주주 : ' + b(pr, 2) + '명 (본인 ' + b(sf, 2) + '명, 위임 ' + b(px, 2) + '명),  출석 의결권 ' + (ps || '　　') + '주 (발행주식 총수의 ' + pct + ')'
         ],
         open: '의장 대표이사 ' + ceo[2] + josa(ceo[2] || '가', '은', '는') + ' 정관 제18조에 따라 의장석에 등단하여, 위와 같이 발행주식 총수 ' + total + '주 중 ' + (ps || '　　') + '주(' + pct + ')의 의결권을 가진 주주가 출석하여 법령과 정관에 정한 의사정족수를 충족하였으므로 본 총회가 적법하게 성립되었음을 알리고 개회를 선언하였다. (개회 ' + b(M.open, 4) + ')',
-        q: '제1호 의안 : 제' + gi + '기(' + year + '.01.01 ~ ' + year + '.12.31) 재무제표 승인의 건 (보통결의)',
+        q: '제1호 의안 : 제' + gi + '기(' + perDots(year) + ') 재무제표 승인의 건 (보통결의)',
         body: '의장은 제1호 의안을 상정하고, 제' + gi + '기 영업보고서를 보고한 뒤 감사 ' + (function () { var a = cover().members.filter(function (m) { return /감\s*사/.test(m[0]); })[0]; return a ? String(a[1]).replace(/\s+/g, '') : '○○○'; })() + '의 감사보고를 듣게 하였다. 이어 재무상태표·손익계산서·이익잉여금처분계산서' + (O ? '(당기순이익 ' + w(O.meta.ni) + ', 배당 없음, 차기이월 미처분이익잉여금 ' + w(O.meta.re) + ')' : '') + '를 별첨 결산서에 따라 설명하고 주주들에게 의견을 구하였으나 별다른 이의가 없어 이를 표결에 부친 바, ' + v1.phrase + ' 원안대로 승인 가결하였다.',
         ok1: v1.ok,
         close: '의장은 이상으로 회의 목적사항 전부를 심의 종료하였으므로 폐회를 선언하였다. (폐회 ' + b(M.close, 4) + ')',
-        end: '위 의사의 경과요령과 결과를 명확히 하기 위하여 이 의사록을 작성하고 의장과 출석한 이사가 다음과 같이 기명날인 또는 서명하다.',
+        end: '위 의사의 경과요령과 결과를 명확히 하기 위하여 이 의사록을 작성하고 의장과 출석한 이사가 다음과 같이 기명날인 또는 서명한다.',
         date: D.no ? D.txt : '　　년　　월　　일',
         ceo: ceo, all: people.filter(function (p) { return p !== ceo; }),
         others: people.filter(function (p) { return p !== ceo && !(M.absent || {})[p[2]]; }),
@@ -6499,7 +6799,7 @@ body{
       out += paraXml('', 9, 'C') + paraXml('', 9, 'C');
       out += titleBlock('이 사 회   결 의 서', 0);
       out += paraXml('', 9, 'C');
-      out += paraXml('이사회의 의결로서 이와 같이 (' + Y + '.01.01 ~ ' + Y + '.12.31)', 40, 'C');
+      out += paraXml('이사회의 의결로써 이와 같이 (' + perDots(Y) + ')', 40, 'C');
       out += paraXml('', B13, 'C') + paraXml('결산 보고서를 제출합니다.', 40, 'C') + paraXml('', B13, 'C') + paraXml('', B13, 'C');
       // 표 없이 원본 결의서처럼: 「직책:  이 름          (인)」, 다음 줄 주소, 그 아래 빈 줄 (날인할 자리)
       var mem = c.members.filter(function (m) { return m[0] || m[1]; });
