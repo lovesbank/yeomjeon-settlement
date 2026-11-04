@@ -3353,7 +3353,7 @@ body{
     // 다음 달 큰 지출 예정: 정해진 달에 나가는 항목 + 예상 금액 (작년 같은 달 → 없으면 가장 최근에 낸 금액 → 없으면 기본값)
     var BIG_EXP = [
       { name: '부가세', months: [1, 4, 7, 10], re: /부가/ },
-      { name: '운영비', months: [3, 6, 9, 12], re: /운영비/ },
+      { name: '운영비', months: [3, 6, 9, 12], re: /운영비/, fix: 11000500 },   // 운영비는 늘 11,000,500원 (11,000,000원 + 은행 수수료 500원)
       { name: '토지임대료', months: [6, 12], re: /임대료/ },
       { name: '법인세', months: [3], re: /법인세/, not: /중간/ },
       { name: '보험료', months: [5], re: /보험/, def: 10000000 },
@@ -3371,13 +3371,14 @@ body{
       var nm = M === 12 ? 1 : M + 1, ny = M === 12 ? Y + 1 : Y, out = [];
       BIG_EXP.forEach(function (it) {
         if (it.months.indexOf(nm) < 0) return;
+        if (it.fix) { out.push({ name: it.name, amt: it.fix, how: '고정' }); return; }
         var amt = paidIn(ny - 1, nm, it), how = '작년 같은 달';
         if (!amt) {   // 가장 최근에 낸 금액 (최대 2년 전까지 거슬러 봄)
           for (var k = 1; k <= 24 && !amt; k++) { var mm = nm - k, yy = ny; while (mm < 1) { mm += 12; yy--; } amt = paidIn(yy, mm, it); }
           how = '최근';
         }
         if (!amt && it.def) { amt = it.def; how = '예상'; }
-        out.push({ name: it.name, amt: Math.round(amt / 1000) * 1000, how: how });
+        out.push({ name: it.name, amt: amt, how: how });   // 반올림 없이 실제 낸 금액 그대로 (은행 수수료 포함)
       });
       return { y: ny, m: nm, list: out };
     }
@@ -3397,7 +3398,7 @@ body{
     function nextLine(N) {
       var h = '【다음 달(' + N.m + '월) 큰 지출 예정】 ';
       if (!N.list.length) return h + '정해진 큰 지출 없음 (매월 송전료·수당·보상금 등만 나감)';
-      return h + N.list.map(function (e) { return e.name + ' ' + (e.amt ? '약 ' + C.formatWon(e.amt) + '원' + (e.how === '예상' ? '(예상)' : '') : '(금액 미정)'); }).join(', ') + ' — 지난 지출 기준 예상 금액';
+      return h + N.list.map(function (e) { return e.name + ' ' + (e.amt ? (e.how === '고정' ? '' : '약 ') + C.formatWon(e.amt) + '원' + (e.how === '예상' ? '(예상)' : '') : '(금액 미정)'); }).join(', ') + ' — 지난 지출 기준 예상 금액';
     }
     function renderShare() {
       var box = $('rptShare'); if (!box || box.contains(document.activeElement)) return;
