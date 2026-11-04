@@ -753,6 +753,7 @@ body{
   #ledger .hd-tbl input, #ledger .hd-tbl select{ font:inherit; width:100%; box-sizing:border-box; border:1px solid #ccd; border-radius:3px; padding:2px 4px; background:#fffef2; text-align:center; }
   #ledger .hd-tbl input.ad{ text-align:left; } #ledger .hd-tbl .no{ width:2.4em; color:#667; }
   #ledger .hd-tbl tr.att td{ background:#eef8ee; }
+  #ledger .hd-tbl select.absent{ color:#c62828; font-weight:700; background:#fdeeee; }
   #ledger .hd-sum{ margin:8px 0; font-size:15px; line-height:1.7; }
   #ledger .hd-paste{ width:100%; box-sizing:border-box; font:inherit; font-size:14px; min-height:90px; }
   #ledger .cv-add{ display:block; margin:8px auto 0; font:inherit; font-size:15px; padding:6px 14px; border:1px solid #1d2b5c; background:#fff; color:#1d2b5c; border-radius:6px; cursor:pointer; }
@@ -4754,7 +4755,7 @@ body{
           '<td><input data-h="' + i + '" data-f="b" inputmode="numeric" placeholder="앞 6자리" value="' + esc(rrnMask(x.b)) + '"></td>' +
           '<td><input class="ad" data-h="' + i + '" data-f="a" value="' + esc(x.a || '') + '"></td>' +
           '<td><input data-h="' + i + '" data-f="s" inputmode="numeric" value="' + esc(x.s || '') + '"></td>' +
-          '<td><select data-hatt="' + i + '"><option value="">불참</option><option value="S"' + (a === 'S' ? ' selected' : '') + '>본인</option><option value="P"' + (a === 'P' ? ' selected' : '') + '>위임</option></select></td>' +
+          '<td><select data-hatt="' + i + '" class="' + (a ? '' : 'absent') + '"><option value="">불참</option><option value="S"' + (a === 'S' ? ' selected' : '') + '>본인</option><option value="P"' + (a === 'P' ? ' selected' : '') + '>위임</option></select></td>' +
           '<td><button type="button" class="cv-del" data-hdel="' + i + '" title="이 주주 지우기">－</button></td></tr>';
       });
       h += '</table><p><button type="button" class="cv-add" id="hdAdd">＋ 주주 추가</button></p>';
@@ -4764,6 +4765,7 @@ body{
         '<br>출석 <b>' + A.present + '명</b> (본인 ' + A.self + '명, 위임 ' + A.proxy + '명), 출석 의결권 <b>' + A.shares + '주</b>' + (total ? ' (발행주식의 ' + Math.round(A.shares / total * 1000) / 10 + '%)' : '') +
         (A.present ? (A.shares * 4 >= total ? ' <span class="check ok">✔ 보통결의 가능(발행주식 4분의 1 이상)</span>' : ' <span class="check warn">⚠ 출석 의결권이 발행주식의 4분의 1(' + Math.ceil(total / 4) + '주)에 못 미쳐 보통결의를 할 수 없습니다</span>') : '') +
         (A.present ? ' <button type="button" class="cv-del" id="hdAttClear" style="width:auto;padding:0 8px">출석 모두 지우기</button>' : '') + '</div>' +
+        '<p><button type="button" class="cv-add" id="hdPng" style="display:inline-block">📷 주주명부 사진으로 저장</button> <span id="hdPngMsg" class="bz-hint"></span></p>' +
         '<p><label class="cv-add" style="display:inline-block">📂 주주명부 한글 파일(.hwpx) 불러오기<input type="file" id="hdFile" accept=".hwpx" hidden></label> <span id="hdMsg" class="bz-hint"></span></p>' +
         '<details><summary>명단 한꺼번에 넣기 (붙여넣기)</summary><p class="bz-hint">한 줄에 한 사람씩 「이름, 주민번호 앞 6자리, 주소, 주식 수」 순서로 적거나 붙여넣으세요. 쉼표나 탭으로 나눕니다. 예) 홍길동, 600101, 백수읍 백수로 100, 12</p>' +
         '<textarea class="hd-paste" id="hdPaste" placeholder="홍길동, 600101, 백수읍 백수로 100, 12"></textarea>' +
@@ -4801,6 +4803,86 @@ body{
         });
         return out;
       });
+    }
+    // 주주명부 사진(PNG): 원래 주주명부 양식처럼 — 번호·주주명·주민등록번호(뒤 7자리 별표)·주소·소유주식수, 합계, 증명 문구, 회사 직인
+    //  (출석 표시·연락처는 넣지 않음)
+    function drawHoldersImage() {
+      var H = holders().filter(function (h) { return String(h.n || '').trim(); }), c0 = cover(), total = c0.shares, par = c0.parValue || 1000;
+      var W = 1080, P = 40, TW = W - 2 * P, FONT = '"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+      var NAVY = '#1f3a68', LINE = '#2b3a55', HEAD = '#e8eef9', ZEBRA = '#f5f8fd', GOLD = '#fff3cf';
+      var Mn = minData(), att = Mn.att || {}, A = holdAtt(Mn), D = titleDate();   // 정기주주총회 참석 여부 (의사록과 같은 출석 표시)
+      // 결산서 사진처럼 휴대폰 한 화면(가로 1 : 세로 1.95)에 거의 차게: 줄 높이를 명단 수에 맞춰 늘림
+      var top = 30, titleH = 96, subH = 44, y0 = top + titleH + subH + 20, TARGET = Math.round(W * 1.95);
+      var RH = Math.max(40, Math.min(66, Math.floor((TARGET - y0 - 340 - 14) / (H.length + 3))));
+      var FP = Math.round(19 * Math.min(1.25, Math.sqrt(RH / 40)));   // 줄이 높아진 만큼 글씨도 조금 크게
+      var tableH = RH * (H.length + 3) + 14, H2 = Math.max(y0 + tableH + 340, H.length ? 0 : 900);
+      var c = document.createElement('canvas'); c.width = W; c.height = H2; var g = c.getContext('2d');
+      function font(px, wt) { return (wt || 400) + ' ' + px + 'px ' + FONT; }
+      function T(t, x, y, px, wt, color, al) { g.font = font(px, wt); g.fillStyle = color || '#111'; g.textAlign = al || 'left'; g.textBaseline = 'middle'; g.fillText(t, x, y); g.textAlign = 'left'; }
+      function fit(t, px, wt, maxW) { g.font = font(px, wt); while (px > 10 && g.measureText(t).width > maxW) { px--; g.font = font(px, wt); } return px; }
+      function cell(x, y, w, h, t, bg, al, wt, color, px) {
+        g.fillStyle = bg || '#fff'; g.fillRect(x, y, w, h); g.strokeStyle = LINE; g.lineWidth = 1.2; g.strokeRect(x, y, w, h);
+        if (t) { var f = fit(t, px || 19, wt || 400, w - 14); T(t, al === 'left' ? x + 8 : al === 'right' ? x + w - 8 : x + w / 2, y + h / 2 + 1, f, wt || 400, color, al || 'center'); }
+      }
+      g.fillStyle = '#fff'; g.fillRect(0, 0, W, H2);
+      drawTitleBand(g, null, P, top, TW, titleH, '주   주   명   부', FONT);
+      var O = fsOfficial(year), gi = O ? O.meta.gi : year - 2018;
+      T('제' + gi + '기 정기주주총회' + (D.no ? ' (' + D.txt + ')' : '') + ' 참석 현황 포함', W / 2, top + titleH + 8 + subH / 2, 21, 700, NAVY, 'center');
+      var cols = [0.07, 0.13, 0.2, 0.38, 0.11, 0.11].map(function (r) { return TW * r; }), xs = [P];
+      cols.forEach(function (w, i) { xs.push(xs[i] + w); });
+      var y = y0;
+      ['번호', '주 주 명', '주민등록번호', '주    소', '소유주식수', '총회 참석'].forEach(function (t, i) { cell(xs[i], y, cols[i], RH + 6, t, HEAD, 'center', 800, NAVY, 20); });
+      y += RH + 6;
+      H.forEach(function (h, i) {
+        var z = i % 2 ? ZEBRA : '#fff', sh = String(h.s || '').replace(/\D/g, '');
+        var a = att[String(h.n).replace(/\s+/g, '')], at = a === 'S' ? '본인' : a === 'P' ? '위임' : '불참';
+        [String(i + 1), String(h.n).replace(/\s+/g, ''), rrnMask(h.b), String(h.a || ''), sh ? sh + '주' : '', at].forEach(function (t, k) {
+          cell(xs[k], y, cols[k], RH, t, k === 5 && a ? '#eef8ee' : k === 5 ? '#fdeeee' : z, k === 3 ? 'left' : 'center', k === 5 ? 700 : 400, k === 5 ? (a === 'S' ? '#1b6e2a' : a === 'P' ? '#1f3a68' : '#c62828') : '#111', k === 5 && !a ? FP : FP);
+        });
+        y += RH;
+      });
+      var sum = H.reduce(function (a, h) { return a + (parseInt(String(h.s || '').replace(/\D/g, ''), 10) || 0); }, 0);
+      cell(xs[0], y, cols[0] + cols[1], RH + 4, '총 주식 수', GOLD, 'center', 800, NAVY, 20);
+      cell(xs[2], y, cols[2], RH + 4, sum + '주', GOLD, 'center', 800, NAVY, 20);
+      cell(xs[3], y, cols[3], RH + 4, '1주당 금액', GOLD, 'center', 800, NAVY, 20);
+      cell(xs[4], y, cols[4] + cols[5], RH + 4, C.formatWon(par) + '원', GOLD, 'center', 800, NAVY, 20);
+      y += RH + 4;
+      var atTxt = '총회 참석 : ' + A.count + '명 중 ' + A.present + '명 (본인 ' + A.self + '명, 위임 ' + A.proxy + '명),  출석 의결권 ' + A.shares + '주' + (total ? ' (발행주식의 ' + Math.round(A.shares / total * 1000) / 10 + '%)' : '');
+      cell(P, y, TW, RH + 4, atTxt, '#eef3fb', 'center', 800, NAVY, 20);
+      g.strokeStyle = NAVY; g.lineWidth = 3; g.strokeRect(P, y0, TW, y + RH + 4 - y0);
+      y += RH + 4 + 46;
+      var now = new Date(), M = minData(), addr = String(M.addr || '').trim() || '전라남도 영광군 백수읍 백수로 224', ceo = ceoName().split('').join('   ');
+      T('위 주주명부는 본사에 비치된 주주명부와 대조하여 틀림이 없음을 증명합니다.', W / 2, y, 22, 700, '#111', 'center'); y += 56;
+      T(now.getFullYear() + '년   ' + (now.getMonth() + 1) + '월   ' + now.getDate() + '일', W / 2, y, 24, 800, NAVY, 'center'); y += 58;
+      var lx = P + 150;
+      T('회 사 명 :  염전마을주민발전주식회사', lx, y, 22, 700); y += 42;
+      T('소 재 지 :  ' + addr, lx, y, fit('소 재 지 :  ' + addr, 22, 700, TW - 160), 700); y += 42;
+      var sign = '대표이사 :  ' + ceo + '        (인)';
+      T(sign, lx, y, 22, 700);
+      g.font = font(22, 700); var ix = lx + g.measureText(sign).width - g.measureText('(인)').width / 2;
+      var st = document.querySelector('.ceoStampBig'), si = st && st.complete && st.naturalWidth ? st : sealImgEl;
+      if (si && si.complete && si.naturalWidth) { g.globalCompositeOperation = 'multiply'; g.drawImage(si, ix - 36, y - 36, 72, 72); g.globalCompositeOperation = 'source-over'; }
+      if (sum !== total) T('※ 주식 합계 ' + sum + '주가 발행주식 총수 ' + total + '주와 다릅니다', W / 2, H2 - 22, 16, 700, '#c62828', 'center');
+      return c;
+    }
+    function saveHoldersImage() {
+      var msg = $('hdPngMsg');
+      if (!holders().some(function (h) { return String(h.n || '').trim(); })) { if (msg) msg.textContent = '⚠ 주주명부가 비어 있습니다.'; return; }
+      try {
+        var c = drawHoldersImage(), t = new Date(), name = '주주명부_' + t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + '.png';
+        c.toBlob(function (blob) {
+          if (!blob) { if (msg) msg.textContent = '⚠ 사진을 만들지 못했습니다.'; return; }
+          var file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) { }
+          if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({ files: [file], title: '주주명부' }).then(function () { if (msg) msg.textContent = '✔ 공유 창을 열었습니다. 「이미지 저장」을 누르면 사진첩에 저장됩니다.'; })
+              .catch(function (e) { if (msg) msg.textContent = e && e.name === 'AbortError' ? '취소했습니다.' : '⚠ 공유하지 못했습니다: ' + (e && e.message); });
+          } else {
+            var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+            setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+            if (msg) msg.textContent = '✔ ' + name + ' 저장했습니다.';
+          }
+        }, 'image/png');
+      } catch (e) { if (msg) msg.textContent = '⚠ 사진을 만들지 못했습니다: ' + e.message; }
     }
     function parseHolders(text) {
       var out = [];
@@ -4861,6 +4943,7 @@ body{
       });
       box.addEventListener('click', function (e) {
         var id = e.target.id, H = holders();
+        if (id === 'hdPng') { saveHoldersImage(); return; }
         if (id === 'hdAdd') { H.push({ n: '', b: '', a: '', s: '' }); save(); e.target.blur(); renderHolders(); var ns = box.querySelectorAll('input[data-f="n"]'); if (ns.length) ns[ns.length - 1].focus(); return; }
         if (id === 'hdAttClear') { if (window.confirm('출석 표시를 모두 지울까요?')) { minData().att = {}; save(); e.target.blur(); renderHolders(); renderMinutes(); } return; }
         if (id === 'hdImport' || id === 'hdReplace') {
