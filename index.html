@@ -1751,7 +1751,7 @@ body{
   /* 수입·지출 자동 기입 기준 (아래 ieAutoBoot에서 씀) */
   const SMP_DAYS = { 1: 6, 2: 13, 3: 21, 4: 27 };
   const EXP_MONTHLY = ['송전료', '대표.감사수당', '보상금', '김균태회계사'];
-  const EXP_SEASON = [['부가세', [1, 4, 7, 10]], ['운영비', [3, 6, 9, 12]], ['토지임대료', [6, 12]], ['법인세', [3]], ['중간법인세', [8]]];
+  const EXP_SEASON = [['부가세', [1, 4, 7, 10]], ['운영비', [3, 6, 9, 12]], ['토지임대료', [6, 12]], ['법인세', [3]], ['법인세조정료', [3]], ['보험료', [5]], ['중간법인세', [8]]];
   /* ===== 부팅 ===== */
   (function boot(){
     snapshotDefaults();
@@ -4036,6 +4036,18 @@ body{
       });
       return { s: s, O: O, comp: cg.total || 0, gT: gT, gN: gN, smpAvg: sN ? sT / sN : 0, smpN: sN, rows: rows, K: O ? O.meta.K : fsLastMonth(year) };
     }
+    // 1kWh당 평균 매출: 전기 판매 대금은 발전한 다음 달에 들어오므로 「m월 발전량」은 「m+1월 입금액」과 짝지음
+    //  (12월 발전분은 다음 해 1월 장부에 입금이 있을 때만 넣음 — 없으면 12월은 계산에서 뺌)
+    function perKwh(N) {
+      var d = yd(), nx = db.years[year + 1], inc = 0, g = 0;
+      N.rows.forEach(function (x) {
+        if (!x.g) return;
+        var paid = x.m < 12 ? C.revenueMonth(d, x.m + 1) : (nx ? C.revenueMonth(nx, 1) : 0);
+        if (!paid) return;   // 아직 입금이 안 된 달(또는 장부에 없는 달)은 뺌
+        inc += paid; g += x.g;
+      });
+      return g ? inc / g : 0;
+    }
     function bizHead(N) { return N.O ? '제 ' + N.O.meta.gi + '기 (' + N.O.meta.perTxt + ')' : year + '년'; }
     function bizPerf(N) {
       var w = C.formatWon, s = N.s, r = [
@@ -4046,14 +4058,25 @@ body{
       if (N.O) r.push(['당기순이익 (손익계산서)', w(N.O.meta.ni) + '원', 1]);
       r.push(['통장 잔액 (' + (N.K || 12) + '월 말)', w(s.balance) + '원', 0]);
       if (N.smpN) r.push(['평균 SMP 단가 (' + N.smpN + '개월)', smpTxt(Math.round(N.smpAvg * 100) / 100) + '원/kWh', 0]);
-      if (N.gT) { r.push(['발전량 합계 (' + N.gN + '개월)', genTxt(Math.round(N.gT * 1000) / 1000) + ' kWh', 1]); r.push(['1kWh당 평균 매출', w(Math.round(N.rows.reduce(function (a, x) { return a + (x.g ? x.inc : 0); }, 0) / N.gT)) + '원', 0]); }
+      if (N.gT) {
+        r.push(['발전량 합계 (' + N.gN + '개월)', genTxt(Math.round(N.gT * 1000) / 1000) + ' kWh', 1]);
+        var P = perKwh(N); if (P) r.push(['1kWh당 평균 매출 (발전 다음 달 입금액 기준)', w(Math.round(P)) + '원', 0]);
+      }
       return r;
     }
     // 영업보고서 맺음말 (영업보고서 마지막 장 맨 아래)
     function bizEndHtml(N) { return '<div class="bz-end">위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.<br>년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일<br><b>염전마을주민발전주식회사 &nbsp; 대표이사 &nbsp; ' + esc(ceoName().split('').join(' ')) + ' &nbsp; (인)</b></div>'; }
     function bizEndXml(N) {
-      return paraXml('', 9, 'C') + paraXml('위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.', 39, 'C') +
-        paraXml('년        월        일', 39, 'C') + paraXml('염전마을주민발전주식회사   대표이사   ' + ceoName().split('').join(' ') + '   (인)', 40, 'C');
+      var head = paraXml('', 9, 'C') + paraXml('위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.', 39, 'C') + paraXml('년        월        일', 39, 'C');
+      var sign = '염전마을주민발전주식회사   대표이사   ' + ceoName().split('').join(' ') + '   (인)';
+      // 한글 파일로 만들 때: 서명 줄을 오른쪽에 맞추고(오른쪽 여백) 「(인)」 위에 회사 직인
+      if (RPT_FILES && addKeepParaPrs(RPT_FILES)) {
+        ensureSeal(RPT_FILES);
+        var line = '<hp:p id="2147483648" paraPrIDRef="' + KEEP_PP.SIGN + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="40"><hp:t>' + xe(sign) + '</hp:t></hp:run></hp:p>';
+        var sealP = '<hp:p id="2147483648" paraPrIDRef="' + KEEP_PP.SIGN + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="39">' + sealPicXml(1237872345, 53000 - SIGN_RM - 1100 - 2700, 150, 5400) + '<hp:t/></hp:run></hp:p>';
+        return head + sealP + line;
+      }
+      return head + paraXml(sign, 40, 'C');
     }
     function renderBiz() {
       var box = $('bizBox'); if (!box) return;
@@ -4418,6 +4441,36 @@ body{
           kids(tr, 'tc').forEach(function (tc) { tc.setAttribute('borderFillIDRef', best(tc.getAttribute('borderFillIDRef'))); });
         });
       });
+    }
+
+    // 지출내역서(상·하반기) 표: 원본 양식의 오른쪽 바깥선이 가는 이중선(0.15mm)이라 왼쪽(0.4mm)보다 약해 보임
+    //  → 맨 오른쪽 칸들의 오른쪽 선만 0.4mm 실선으로 (테두리 모양을 복사해 새로 덧붙임, header.xml은 문자열로만 고침)
+    function fixRightEdge(doc, files) {
+      var hf = files.filter(function (f) { return f.name === 'Contents/header.xml'; })[0]; if (!hf) return;
+      var x = new TextDecoder().decode(hf.data), m = x.match(/<hh:borderFills itemCnt="(\d+)">/); if (!m) return;
+      var next = +m[1] + 1, made = {}, add = '';
+      var RIGHT = '<hh:rightBorder type="SOLID" width="0.4 mm" color="#000000"/>';
+      function thick(id) {
+        if (made[id]) return made[id];
+        var b = x.match(new RegExp('<hh:borderFill id="' + id + '"[\\s\\S]*?<\\/hh:borderFill>')); if (!b) return id;
+        if (b[0].indexOf(RIGHT) >= 0) return (made[id] = id);   // 이미 굵은 실선
+        var nid = String(next++);
+        add += b[0].replace('id="' + id + '"', 'id="' + nid + '"').replace(/<hh:rightBorder [^>]*\/>/, RIGHT);
+        return (made[id] = nid);
+      }
+      Array.prototype.forEach.call(doc.getElementsByTagNameNS(HP, 'tbl'), function (tb) {
+        var head = Array.prototype.slice.call(tb.getElementsByTagNameNS(HP, 't'), 0, 8).map(function (t) { return t.textContent; }).join('').replace(/\s+/g, '');
+        if (!/^월일내역금액월일내역금액/.test(head)) return;
+        var nc = +tb.getAttribute('colCnt');
+        Array.prototype.forEach.call(tb.getElementsByTagNameNS(HP, 'tc'), function (tc) {
+          var a = tc.getElementsByTagNameNS(HP, 'cellAddr')[0], sp = tc.getElementsByTagNameNS(HP, 'cellSpan')[0];
+          if (!a || +a.getAttribute('colAddr') + (sp ? +sp.getAttribute('colSpan') : 1) !== nc) return;
+          tc.setAttribute('borderFillIDRef', thick(tc.getAttribute('borderFillIDRef')));
+        });
+      });
+      if (!add) return;
+      x = x.replace(m[0], '<hh:borderFills itemCnt="' + (next - 1) + '">').replace('</hh:borderFills>', add + '</hh:borderFills>');
+      hf.data = new TextEncoder().encode(x);
     }
 
     // 수입·지출 표(원본 양식 4번째 표): 글자 1pt 작게(양식에 있는 같은 모양의 작은 글자로 바꿈), 줄 높이 85%
@@ -4848,6 +4901,43 @@ body{
       if (frag.getElementsByTagName('parsererror').length) throw new Error('의사록 변환 오류');
       Array.prototype.slice.call(frag.documentElement.childNodes).forEach(function (n) { sec.appendChild(doc.importNode(n, true)); });
     }
+    // 「다음 문단과 같은 쪽에」(keepWithNext) 문단 모양 3개를 header.xml에 덧붙임: 45=오른쪽(27), 46=왼쪽(31), 47=가운데(30)
+    // (header.xml은 문자열로만 고침 — DOM으로 다시 쓰면 휴대폰 뷰어가 깨졌던 적이 있음)
+    var KEEP_PP = { R: 45, L: 46, C: 47, SIGN: 48 }, SIGN_RM = 4000;   // SIGN: 오른쪽 맞춤 + 오른쪽 여백(직인이 종이 밖으로 안 나가게)
+    function addKeepParaPrs(files) {
+      var hf = files && files.filter(function (f) { return f.name === 'Contents/header.xml'; })[0]; if (!hf) return false;
+      var x = new TextDecoder().decode(hf.data);
+      if (x.indexOf('<hh:paraPr id="' + KEEP_PP.SIGN + '"') >= 0) return x.indexOf('<hh:paraProperties itemCnt="49">') >= 0;   // 이미 덧붙였으면 그대로 사용
+      var m = x.match(/<hh:paraProperties itemCnt="(\d+)">/);
+      if (!m || +m[1] !== 45) return false;   // 양식이 다르면 덧붙이지 않음 (그냥 보통 문단으로)
+      var add = '';
+      // [원본 id, 새 id, 다음 문단과 함께, 오른쪽 여백]
+      [[27, KEEP_PP.R, 1, 1], [31, KEEP_PP.L, 1, 0], [30, KEEP_PP.C, 1, 0], [27, KEEP_PP.SIGN, 0, 1]].forEach(function (pr) {
+        var base = x.match(new RegExp('<hh:paraPr id="' + pr[0] + '"[\\s\\S]*?<\\/hh:paraPr>'));
+        if (!base) return;
+        var t = base[0].replace('id="' + pr[0] + '"', 'id="' + pr[1] + '"');
+        if (pr[2]) t = t.replace('keepWithNext="0"', 'keepWithNext="1"');
+        if (pr[3]) t = t.split('<hc:right value="0" unit="HWPUNIT"/>').join('<hc:right value="' + SIGN_RM + '" unit="HWPUNIT"/>');
+        add += t;
+      });
+      if ((add.match(/<hh:paraPr /g) || []).length !== 4) return false;
+      x = x.replace(m[0], '<hh:paraProperties itemCnt="49">').replace('</hh:paraProperties>', add + '</hh:paraProperties>');
+      hf.data = new TextEncoder().encode(x);
+      return true;
+    }
+    // 회사 직인 그림 (글 뒤, 문단 기준 위치). w = 크기(정사각형에 가깝게)
+    function sealPicXml(id, hOff, vOff, w) {
+      var h = Math.round(w * 6200 / 6300);
+      return '<hp:pic id="' + id + '" zOrder="900" numberingType="PICTURE" textWrap="BEHIND_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="' + (id - 1073741823) + '" reverse="0">' +
+        '<hp:offset x="0" y="0"/><hp:orgSz width="' + w + '" height="' + h + '"/><hp:curSz width="0" height="0"/><hp:flip horizontal="0" vertical="0"/>' +
+        '<hp:rotationInfo angle="0" centerX="' + Math.round(w / 2) + '" centerY="' + Math.round(h / 2) + '" rotateimage="1"/><hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
+        '<hc:img binaryItemIDRef="sealimg" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
+        '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + w + '" y="0"/><hc:pt2 x="' + w + '" y="' + h + '"/><hc:pt3 x="0" y="' + h + '"/></hp:imgRect>' +
+        '<hp:imgClip left="0" right="21960" top="0" bottom="21600"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="21960" dimheight="21600"/><hp:effects/>' +
+        '<hp:sz width="' + w + '" widthRelTo="ABSOLUTE" height="' + h + '" heightRelTo="ABSOLUTE" protect="0"/>' +
+        '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="' + vOff + '" horzOffset="' + hOff + '"/>' +
+        '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>회사 직인</hp:shapeComment></hp:pic>';
+    }
     function insertResolution(doc, Y, files) {
       var sec = doc.documentElement, ps = kids(sec, 'p');
       function textOf(p) { return (p.textContent || '').replace(/\s+/g, ''); }
@@ -4861,33 +4951,30 @@ body{
       ps.forEach(function (p) { if (/영수증/.test(textOf(p)) && !p.getElementsByTagNameNS(HP, 'tbl').length) after = p; });
       if (!after) return;
       var c = cover(), B13 = 39, H13 = 11, HEAD = 49, S11 = 6, out = '';
+      // 마지막 이사 줄부터 회사 이름·직인까지는 한 덩어리로 (회사 이름과 직인만 다음 장으로 넘어가지 않게)
+      var keep = addKeepParaPrs(files);
+      function kp(xml, al) { return keep ? xml.replace(/paraPrIDRef="\d+"/, 'paraPrIDRef="' + KEEP_PP[al] + '"') : xml; }
       out += paraXml('', 9, 'C') + paraXml('', 9, 'C');
       out += titleBlock('이 사 회   결 의 서', 0);
       out += paraXml('', 9, 'C');
       out += paraXml('이사회의 의결로서 이와 같이 (' + Y + '.01.01 ~ ' + Y + '.12.31)', 40, 'C');
       out += paraXml('', B13, 'C') + paraXml('결산 보고서를 제출합니다.', 40, 'C') + paraXml('', B13, 'C') + paraXml('', B13, 'C');
       // 표 없이 원본 결의서처럼: 「직책:  이 름          (인)」, 다음 줄 주소, 그 아래 빈 줄 (날인할 자리)
-      c.members.filter(function (m) { return m[0] || m[1]; }).forEach(function (m, i) {
+      var mem = c.members.filter(function (m) { return m[0] || m[1]; });
+      mem.forEach(function (m, i) {
         var role = String(m[0] || '').replace(/\s+/g, '') + ':';
         var name = String(m[1] || '').replace(/\s+/g, '').split('').join('   ');
         var adr = String(m[2] || '').trim(); if (adr && !/^전라남도/.test(adr)) adr = '전라남도 영광군 ' + adr;
-        out += paraXml('            ' + (role.length < 5 ? '    ' : '') + role + '   ' + name + '                              (인)', B13, 'L');
-        out += paraXml('                        ' + adr, B13, 'L');
-        out += paraXml('', B13, 'L');
+        var last = i === mem.length - 1, K = function (x) { return last ? kp(x, 'L') : x; };
+        out += K(paraXml('            ' + (role.length < 5 ? '    ' : '') + role + '   ' + name + '                              (인)', B13, 'L'));
+        out += K(paraXml('                        ' + adr, B13, 'L'));
+        out += K(paraXml('', B13, 'L'));
       });
       // 회사 이름 + 직인: 빈 줄에 직인을 걸어 두고, 다음 줄 회사 이름(오른쪽 맞춤)의 끝 글자 「사」 가운데에 직인 가운데가 오게
-      out += paraXml('', 9, 'C');
-      out += '<hp:p id="2147483648" paraPrIDRef="27" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + B13 + '">' +
-        '<hp:pic id="1237872045" zOrder="900" numberingType="PICTURE" textWrap="BEHIND_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="164130222" reverse="0">' +
-        '<hp:offset x="0" y="0"/><hp:orgSz width="6300" height="6200"/><hp:curSz width="0" height="0"/><hp:flip horizontal="0" vertical="0"/>' +
-        '<hp:rotationInfo angle="0" centerX="3150" centerY="3100" rotateimage="1"/><hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
-        '<hc:img binaryItemIDRef="sealimg" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
-        '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="6300" y="0"/><hc:pt2 x="6300" y="6200"/><hc:pt3 x="0" y="6200"/></hp:imgRect>' +
-        '<hp:imgClip left="0" right="21960" top="0" bottom="21600"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="21960" dimheight="21600"/><hp:effects/>' +
-        '<hp:sz width="6300" widthRelTo="ABSOLUTE" height="6200" heightRelTo="ABSOLUTE" protect="0"/>' +
-        '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="400" horzOffset="48950"/>' +
-        '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>회사 직인</hp:shapeComment></hp:pic><hp:t/></hp:run></hp:p>';
-      out += '<hp:p id="2147483648" paraPrIDRef="27" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="29"><hp:t>' + xe('염  전  마  을  주  민  발  전  주  식  회  사') + '</hp:t></hp:run></hp:p>';
+      out += kp(paraXml('', 9, 'C'), 'C');
+      out += '<hp:p id="2147483648" paraPrIDRef="' + (keep ? KEEP_PP.R : 27) + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + B13 + '">' +
+        sealPicXml(1237872045, keep ? 48950 - SIGN_RM : 48950, 400, 6300) + '<hp:t/></hp:run></hp:p>';
+      out += '<hp:p id="2147483648" paraPrIDRef="' + (keep ? KEEP_PP.R : 27) + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="29"><hp:t>' + xe('염  전  마  을  주  민  발  전  주  식  회  사') + '</hp:t></hp:run></hp:p>';
       out += paraXml('', B13, 'C');
       var hc = 'http://www.hancom.co.kr/hwpml/2011/core';
       var frag = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '" xmlns:hc="' + hc + '">' + out + '</root>', 'application/xml');
@@ -4962,6 +5049,7 @@ body{
         if (doc.getElementsByTagName('parsererror').length) throw new Error('양식 파일을 읽을 수 없습니다');
         fillLedger(doc, Y);
         paintSumRows(doc, files);
+        fixRightEdge(doc, files);   // 지출내역서 오른쪽 바깥선을 왼쪽처럼 굵게
         shrinkIncome(doc);   // 수입·지출 표를 약간 작게 (항목별 표와 한 장에)
         useMalgun(files);   // 모든 글꼴을 맑은 고딕으로
         insertItems(doc, Y, 17);
