@@ -5042,15 +5042,15 @@ body{
           if (b.k === 'tbl') return a + b.rows.length * 1600 + 1700;
           if (b.k === 'p') return a + (b.c ? lines(b.t, 0) * 1400 : lines(b.t, b.ind) * Math.round(1300 * sp / 100) + 100) + (b.after ? 1100 : 0);
           return a;
-        }, 0);
+        }, 0) * 0.945;   // 한컴독스 실제 화면(3월 165%·11월 160%)과 맞춘 보정값
       }
       // 쪽 수는 그대로 두고, 마지막 장(폐회선언까지)이 88% 가까이 차도록 줄 간격을 130~260% 사이에서 가장 넓게
       var base = Math.floor(H(160) / PAGE), best = 160, bestF = -1;
       for (var sp = 130; sp <= 260; sp += 5) {
         var h = H(sp), pg = Math.floor(h / PAGE), f = (h % PAGE) / PAGE;
-        if (pg === base && f <= 0.88 && f > bestF) { best = sp; bestF = f; }
+        if (pg === base && f <= 0.9 && f > bestF) { best = sp; bestF = f; }
       }
-      if (bestF < 0) for (sp = 155; sp >= 120; sp -= 5) { h = H(sp); f = (h % PAGE) / PAGE; if (f <= 0.88) { best = sp; bestF = f; break; } }   // 넘칠 듯하면 좁힘
+      if (bestF < 0) for (sp = 155; sp >= 120; sp -= 5) { h = H(sp); f = (h % PAGE) / PAGE; if (f <= 0.9) { best = sp; bestF = f; break; } }   // 넘칠 듯하면 좁힘
       window.__docFill = { sp: best, frac: bestF, h: H(best) };
       return best;
     }
@@ -5078,6 +5078,7 @@ body{
         at = out.length;
         if (b.k === 'pb') { first = false; needPB = true; return; }
         if (b.k === 'coseal') {
+          for (var xg = 0; xg < (b.xGap || 0); xg++) out += paraXml('', 39, 'L');   // 빈 줄은 직인 붙는 줄보다 위에 넣어야 직인이 (인)에서 안 어긋남
           if (files && addTitleCharPrs(files)) { ensureSeal(files); out += coSealXml(1237872190 + (sealN++)); }
           else out += paraXml('염 전 마 을 주 민 발 전 주 식 회 사      (인)', 40, 'C');
           first = false; return;
@@ -5377,14 +5378,14 @@ body{
       P(dateTxt(B.date), 0, { c: true, b: true });
       P('위 결의를 명확히 하기 위하여 이 의사록을 작성하고 의장과 출석한 이사 및 감사는 다음에 기명날인한다(정관 제36조 제2항).', 0);
       bl.push({ k: 'gap' });
-      var SG = dIn.concat(aIn), sgGap = SG.length <= 6 ? 3 : SG.length <= 8 ? 2 : 1;   // 도장 찍을 자리: 사람 사이를 벌림 (적으면 두 줄, 많으면 한 줄)
+      var SG = dIn.concat(aIn), sgGap = SG.length <= 6 ? 3 : SG.length <= 8 ? 2 : SG.length === 9 ? 1 : 0;   // 10명(이사 9 + 감사)이면 한 장에 들어가게 간격 없이   // 도장 찍을 자리: 사람 사이를 벌림 (적으면 두 줄, 많으면 한 줄)
       SG.forEach(function (o, i) {
         bl.push({ k: 'sign', t: (o === ceoO ? '대표이사' : o.role) + ':   ' + spaced(o.name) + '            (인)' });
         if (o.addr) { bl.push({ k: 'gap', half: true }); P(o.addr, 0, { c: true, color: '#444' }); }   // 이름과 주소 사이도 조금 띄움
         if (i < SG.length - 1) for (var g = 0; g < sgGap; g++) bl.push({ k: 'gap' });
       });
-      for (var g2 = 0; g2 < sgGap + 2; g2++) bl.push({ k: 'gap' });   // 명단 아래 넉넉히 띄우고
-      bl.push({ k: 'coseal' });   // 회사 이름 크게·굵게 + (인) 위에 회사 직인 (표지와 같은 모양)
+      for (var g2 = 0; g2 < (SG.length >= 9 ? 1 : sgGap + 2); g2++) bl.push({ k: 'gap' });   // 명단 아래 넉넉히 띄우고
+      bl.push({ k: 'coseal', xGap: 2 });   // 한글 파일은 서명란 장에 여유가 있어 회사 이름 위를 두 줄 더 띄움 · 회사 이름 크게·굵게 + (인) 위에 회사 직인 (표지와 같은 모양)
       bl.fillBody = true;   // 한글 파일: 본문 마지막 장이 절반 넘게 차도록 줄 간격 자동
       // 문단 나누기 (주주총회 의사록처럼): 큰 항목·□ 문단·※ 앞에서 한 칸 띄움
       bl.forEach(function (b, i) {
