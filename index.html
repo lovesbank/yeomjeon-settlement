@@ -258,12 +258,20 @@ body{
     font-weight:800;
   }
 
-  #report .colDate{ width:7%; }
-  #report .colDesc{ width:21%; }
-  #report .colAmt{ width:15%; }
-  #report .colDesc2{ width:21%; }
-  #report .colAmt2{ width:15%; }
-  #report .colBigo{ width:14%; }
+  /* 수입·지출 반반 (비고 칸 없앰) */
+  #report .colDate{ width:9%; }
+  #report .colDesc{ width:23%; }
+  #report .colAmt{ width:18%; }
+  #report .colDesc2{ width:23%; }
+  #report .colAmt2{ width:18%; }
+  /* 비고 칸: 숨김 (칸 속 입력란은 저장 순서 때문에 남겨 둠) */
+  #report #incomeExpenseTable tbody td:nth-child(7),
+  #report #incomeExpenseTable tfoot th:nth-child(5){ display:none; }
+  /* 수입 | 지출 가운데 분리선 */
+  #report #incomeExpenseTable thead tr:first-child th:nth-child(2),
+  #report #incomeExpenseTable thead tr.subhead th:nth-child(4),
+  #report #incomeExpenseTable tbody td:nth-child(4),
+  #report #incomeExpenseTable tfoot th:nth-child(3){ border-left:6px double #1f3a68 !important; }
 
   #report .bankWrap{
     border:var(--b) solid var(--ink);
@@ -336,11 +344,14 @@ body{
   #report .rptShare{ margin:10px 0 12px; border:1.5px solid #1f3a68; border-radius:6px; overflow:hidden; font-size:14px; }
   #report .rptShare .sh-h{ background:linear-gradient(#ffffff,#c0cdef); color:#1f3a68; font-weight:900; padding:6px 10px; }
   #report .rptShare ul{ margin:0; padding:8px 12px 8px 26px; line-height:1.75; font-weight:700; color:#111; font-size:16px; }
-  #report .bankTbl tbody tr.rowHide{ display:none; }
+  #report .bankTbl tbody tr.rowHide, #report #incomeExpenseTable tbody tr.rowHide{ display:none; }
   #report .rptShare .sh-big{ margin:8px 10px 2px; padding:8px 12px; background:#fff6e0; border:1.5px solid #e0b84c; border-radius:6px; text-align:center; font-weight:900; color:#1f3a68; font-size:17px; line-height:1.5; }
   #report .rptShare .sh-big .amt{ color:#c62828; font-size:26px; letter-spacing:-0.5px; }
   #report .rptShare .sh-big small{ display:block; font-size:13px; font-weight:700; color:#555; }
-  #report .rptShare li.nx{ color:#8a4b00; }
+  #report .rptShare li.nx{ color:#8a4b00; font-size:19px; font-weight:900; margin-top:2px; }
+  #report .rptShare li.nx input.ni{ display:inline-block !important; width:130px !important; height:auto !important; font:inherit; text-align:right !important; border:1.5px solid #e0b84c !important; border-radius:4px; background:#fffdf3 !important; padding:1px 5px !important; color:#c62828 !important; }
+  #report .rptShare li.nx .hint{ font-size:12px; color:#999; font-weight:400; }
+  @media print{ #report .rptShare li.nx .hint{ display:none; } }
   #report .rptShare b{ color:#1f3a68; } #report .rptShare .rd{ color:#c62828; font-weight:800; }
   #report .rptShare .sh-set{ border-top:1px dashed #9aa; padding:6px 10px; font-size:12px; color:#666; }
   #report .rptShare .sh-set input{ display:inline-block !important; width:52px !important; height:auto !important; font:inherit; text-align:center !important; border:1px solid #bbb !important; padding:1px 3px !important; } #report .rptShare .sh-set input.nm{ width:120px !important; }
@@ -876,13 +887,11 @@ body{
           <colgroup>
             <col class="colDate"><col class="colDesc"><col class="colAmt">
             <col class="colDate"><col class="colDesc2"><col class="colAmt2">
-            <col class="colBigo">
           </colgroup>
           <thead>
             <tr>
               <th colspan="3">수&nbsp;&nbsp;입</th>
               <th colspan="3">지&nbsp;&nbsp;출</th>
-              <th>비&nbsp;&nbsp;고</th>
             </tr>
             <tr class="subhead">
               <th class="center shIn">날짜</th>
@@ -891,7 +900,6 @@ body{
               <th class="center shOut">날짜</th>
               <th class="center shOut">적&nbsp;&nbsp;요</th>
               <th class="center shOut">금&nbsp;&nbsp;액</th>
-              <th class="center"></th>
             </tr>
           </thead>
           <tbody>
@@ -1492,7 +1500,31 @@ body{
     recalcIncomeExpense();
     recalcBank();
     fitBankRows();
+    fitIeRows();
   }
+
+  /* 수입/지출 내역 표: 기본 8줄만 보이고, 내용이 8줄을 넘으면 그만큼 늘어남
+     (전체 12줄은 그대로 있어 저장·계산은 같음. 맨 아래 보이는 줄에 들어가 적으면 한 줄이 더 열림) */
+  var ieFocusRow = -1;   // var: 위에서 먼저 불려도 오류 없게
+  function fitIeRows(){
+    const IE_MIN_ROWS = 8, t = RPT.querySelector('#incomeExpenseTable'); if (!t) return;
+    const rows = t.querySelectorAll('tbody tr'); let last = -1;
+    rows.forEach((tr, i)=>{
+      const f = tr.querySelectorAll('input:not(.dtcol)'); if (f.length < 4) return;
+      if (f[0].value.trim() || toNumber(f[1].value) || f[2].value.trim() || toNumber(f[3].value)) last = i;
+    });
+    const fr = typeof ieFocusRow === 'number' ? ieFocusRow : -1, need = Math.max(IE_MIN_ROWS, last + 1, fr + 2);
+    rows.forEach((tr, i)=>{ tr.classList.toggle('rowHide', i >= need); });
+  }
+  (function(){
+    const t = RPT.querySelector('#incomeExpenseTable'); if (!t) return;
+    t.addEventListener('focusin', e=>{
+      const tr = e.target.closest('tbody tr'); if (!tr) return;
+      ieFocusRow = Array.prototype.indexOf.call(tr.parentNode.children, tr); fitIeRows();
+    });
+    t.addEventListener('focusout', ()=>{ setTimeout(()=>{ if (!t.contains(document.activeElement)) { ieFocusRow = -1; fitIeRows(); } }, 0); });
+    t.addEventListener('input', ()=>fitIeRows());
+  })();
 
   /* 은행 입출금 표: 기본 10줄만 보이고, 거래가 10개를 넘으면 그만큼 줄이 늘어남
      (숨긴 줄도 그대로 있어 저장·잔액 계산은 같음 → 줄어든 자리만큼 주민 안내가 위로 올라옴) */
@@ -3370,7 +3402,30 @@ body{
       }
       var S = shareInfo(), units = (+S.hh || 0) + (+S.extra || 0);
       function per(v) { return units ? Math.round(v / units / 1000) * 1000 : 0; }
-      return { Y: Y, M: M, inc: inc, exp: exp, comp: comp, end: C.parseWon(($('endBal') || {}).value) || 0, cInc: cInc, cExp: cExp, cComp: cComp, units: units, S: S, per: per(comp), cPer: per(cComp), next: nextBigExpenses(Y, M) };
+      var next = nextBigExpenses(Y, M), fixAvg = monthlyFixedAvg(Y, M);
+      var nextExp = fixAvg + next.list.reduce(function (a, e) { return a + (e.amt || 0); }, 0);
+      var ni = S.nextInc && S.nextInc[Y + '-' + M], nextInc = ni === '' || ni == null ? null : Number(ni) || 0;
+      var end = C.parseWon(($('endBal') || {}).value) || 0;
+      return { Y: Y, M: M, inc: inc, exp: exp, comp: comp, end: end, cInc: cInc, cExp: cExp, cComp: cComp, units: units, S: S, per: per(comp), cPer: per(cComp),
+        next: next, fixAvg: fixAvg, nextExp: nextExp, nextInc: nextInc, nextBal: nextInc == null ? null : end + nextInc - nextExp };
+    }
+    // 매월 나가는 지출(송전료·대표·감사 수당·보상금·회계사)의 1월~이번 달 월평균 → 다음 달 예상 지출의 기본
+    var MONTHLY_EXP_RE = /(송전|수당|보상|사람과사람|세무|조정료|김균태|회계)/;
+    function monthlyFixedAvg(Y, M) {
+      var d = db.years[Y], sum = 0, n = 0;
+      for (var m = 1; m < M; m++) {   // 지난달까지는 장부에서
+        var rows = (d && d.expense && d.expense[m]) || [], any = false;
+        rows.forEach(function (r) { var a = Number(r && r.amount) || 0; if (!a) return; any = true; if (MONTHLY_EXP_RE.test(String(r.item || ''))) sum += a; });
+        if (any) n++;
+      }
+      var anyNow = false;   // 이번 달은 결산서에서 (지출을 적었을 때만 평균에 넣음)
+      RPT.querySelectorAll('#incomeExpenseTable tbody tr').forEach(function (tr) {
+        var f = tr.querySelectorAll('input:not(.dtcol)'); if (f.length < 4) return;
+        var a = C.parseWon(f[3].value) || 0; if (!a) return; anyNow = true;
+        if (MONTHLY_EXP_RE.test(f[2].value)) sum += a;
+      });
+      if (anyNow) n++;
+      return n ? sum / n : 0;
     }
     // 다음 달 큰 지출 예정: 정해진 달에 나가는 항목 + 예상 금액 (작년 같은 달 → 없으면 가장 최근에 낸 금액 → 없으면 기본값)
     var BIG_EXP = [
@@ -3414,26 +3469,46 @@ body{
       var w = function (v) { return C.formatWon(v) + '원'; }, S = X.S, ex = +S.extra || 0;
       var out = ['【이번 달】 전기 판매 수입 ' + w(X.inc) + ', 지출 ' + w(X.exp) + '(이 중 주민 보상금 ' + w(X.comp) + (X.comp && X.units ? ', 1가구당 약 ' + w(X.per) : '') + ')이고, 통장에 ' + w(X.end) + '이 남았습니다.'];
       out.push('【올해 누적 (1~' + X.M + '월)】 수입 ' + w(X.cInc) + ', 지출 ' + w(X.cExp) + ', 주민 보상금 ' + w(X.cComp));
-      out.push(nextLine(X.next));
+      out.push(nextLine(X));
       return out;
     }
-    function nextLine(N) {
-      var h = '【다음 달(' + N.m + '월) 큰 지출 예정】 ';
-      if (!N.list.length) return h + '정해진 큰 지출 없음 (매월 송전료·수당·보상금 등만 나감)';
-      // 모두 대략 금액으로: 기본 10만 원 단위(약 1,100만 원), 세금(법인세·중간법인세·부가세)은 백만 원 단위(약 800만 원)
-      function rough(v, step) { step = step || 100000; var t = Math.round(v / step) * (step / 10000); return t >= 10000 ? C.formatWon(Math.floor(t / 10000)) + '억 ' + (t % 10000 ? C.formatWon(t % 10000) + '만 원' : '원') : C.formatWon(t) + '만 원'; }
-      return h + N.list.map(function (e) { return e.name + ' ' + (!e.amt ? '(금액 미정)' : '약 ' + rough(e.amt, e.step)); }).join(', ') + ' — 지난 지출 기준 대략적인 예상 금액';
+    // 대략 금액: 10만 원 단위 (예: 약 1,100만 원, 약 1억 2,300만 원)
+    function rough(v) {
+      var neg = v < 0, t = Math.round(Math.abs(v) / 100000) * 10, s;
+      s = t >= 10000 ? C.formatWon(Math.floor(t / 10000)) + '억' + (t % 10000 ? ' ' + C.formatWon(t % 10000) + '만 원' : ' 원') : C.formatWon(t) + '만 원';
+      return (neg ? '-' : '') + s;
+    }
+    // 【다음 달 예상】 수입(직접 적음) · 지출(매월 평균 + 그 달 큰 지출, 합계만) → 남을 통장 잔액
+    function nextHead(X) { return '【다음 달(' + X.next.m + '월) 예상】'; }
+    function nextLine(X) {
+      var t = nextHead(X) + ' ';
+      if (X.nextInc != null) t += '수입 약 ' + rough(X.nextInc) + ', ';
+      t += '지출 약 ' + rough(X.nextExp);
+      if (X.nextBal != null) t += ' → 통장 잔액 약 ' + rough(X.nextBal) + ' 예상';
+      return t;
     }
     function renderShare() {
       var box = $('rptShare'); if (!box || box.contains(document.activeElement)) return;
       var X = shareCalc(), S = X.S;
       var B = shareBig(X), big = B ? '<div class="sh-big">' + esc(B.head) + ' &nbsp;<span class="amt">' + esc(B.amt) + '</span><small>' + esc(B.sub) + '</small></div>' : '';
-      box.innerHTML = '<div class="sh-h">■ 주민 안내</div>' + big + '<ul>' + shareLines(X).map(function (x) { return '<li' + (/^【다음 달/.test(x) ? ' class="nx"' : '') + '>' + esc(x).replace(/(약 [\d,]+(?:억 [\d,]+만 원|억 원|만 원|원))/g, '<span class="rd">$1</span>').replace(/^(【[^】]+】)/, '<b>$1</b>') + '</li>'; }).join('') + '</ul>' +
+      var hl = function (h) { return h.replace(/(약 -?[\d,]+(?:억 [\d,]+만 원|억 원|만 원|원))/g, '<span class="rd">$1</span>'); };
+      var ni = X.nextInc == null ? '' : C.formatWon(X.nextInc);
+      var nextLi = '<li class="nx"><b>' + esc(nextHead(X)) + '</b> 수입 <input class="ni" data-k="nextInc" inputmode="numeric" placeholder="예상 수입 적기" value="' + esc(ni) + '">원, ' +
+        hl(esc('지출 약 ' + rough(X.nextExp))) + (X.nextBal != null ? hl(esc(' → 통장 잔액 약 ' + rough(X.nextBal) + ' 예상')) : ' <span class="hint">(예상 수입을 적으면 남을 잔액도 나옵니다)</span>') + '</li>';
+      box.innerHTML = '<div class="sh-h">■ 주민 안내</div>' + big + '<ul>' + shareLines(X).filter(function (x) { return !/^【다음 달/.test(x); }).map(function (x) { return '<li>' + esc(x).replace(/(약 [\d,]+(?:억 [\d,]+만 원|억 원|만 원|원))/g, '<span class="rd">$1</span>').replace(/^(【[^】]+】)/, '<b>$1</b>') + '</li>'; }).join('') + nextLi + '</ul>' +
         '<div class="sh-set">나눔 기준: 주주 <input data-k="hh" inputmode="numeric" value="' + esc(S.hh) + '">가구 + <input class="nm" data-k="name" value="' + esc(S.name) + '"> <input data-k="extra" inputmode="numeric" value="' + esc(S.extra) + '">몫 (1천원 단위 반올림, 「보상」이 들어간 지출만 계산)</div>';
     }
     (function () {
       var box = $('rptShare'); if (!box) return;
-      box.addEventListener('input', function (e) { var k = e.target.getAttribute('data-k'); if (!k) return; shareInfo()[k] = k === 'name' ? e.target.value : (parseInt(e.target.value, 10) || 0); saveSoon(); });
+      box.addEventListener('input', function (e) {
+        var k = e.target.getAttribute('data-k'); if (!k) return;
+        if (k === 'nextInc') {   // 다음 달 예상 수입: 달마다 따로 저장 (빈칸이면 지움)
+          var Rm = reportYM(), S = shareInfo(), v = String(e.target.value || '').trim();
+          S.nextInc = S.nextInc || {};
+          if (v === '') delete S.nextInc[Rm.y + '-' + Rm.m]; else S.nextInc[Rm.y + '-' + Rm.m] = C.parseWon(v) || 0;
+        } else shareInfo()[k] = k === 'name' ? e.target.value : (parseInt(e.target.value, 10) || 0);
+        saveSoon();
+      });
       box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) renderShare(); }, 0); });
       var t; RPT.addEventListener('input', function (e) { if (box.contains(e.target)) return; clearTimeout(t); t = setTimeout(renderShare, 300); });
     })();
@@ -3490,17 +3565,19 @@ body{
       y += 140;
       // 수입/지출 내역서
       T('○ ' + txt($('titleIncomeExpense')), P, y + 16, 24, 800, INK); y += 40;
-      var ieCols = [TW * 0.08, TW * 0.2, TW * 0.15, TW * 0.08, TW * 0.2, TW * 0.15, TW * 0.14];
+      var ieCols = [TW * 0.09, TW * 0.23, TW * 0.18, TW * 0.09, TW * 0.23, TW * 0.18];   // 수입·지출 반반 (비고 없음)
       var ieRows = [
-        [{ t: '수    입', cs: 3, bg: NAVY, color: '#fff', wt: 800 }, { t: '지    출', cs: 3, bg: NAVY, color: '#fff', wt: 800 }, { t: '비    고', bg: NAVY, color: '#fff', wt: 800 }],
-        [{ t: '날짜', bg: BLUE, wt: 700 }, { t: '적  요', bg: BLUE, wt: 700 }, { t: '금  액', bg: BLUE, wt: 700 }, { t: '날짜', bg: PEACH, wt: 700 }, { t: '적  요', bg: PEACH, wt: 700 }, { t: '금  액', bg: PEACH, wt: 700 }, { t: '', bg: GRAY }]
+        [{ t: '수    입', cs: 3, bg: NAVY, color: '#fff', wt: 800 }, { t: '지    출', cs: 3, bg: NAVY, color: '#fff', wt: 800 }],
+        [{ t: '날짜', bg: BLUE, wt: 700 }, { t: '적  요', bg: BLUE, wt: 700 }, { t: '금  액', bg: BLUE, wt: 700 }, { t: '날짜', bg: PEACH, wt: 700 }, { t: '적  요', bg: PEACH, wt: 700 }, { t: '금  액', bg: PEACH, wt: 700 }]
       ];
-      RPT.querySelectorAll('#incomeExpenseTable tbody tr').forEach(function (tr, i) {
+      RPT.querySelectorAll('#incomeExpenseTable tbody tr:not(.rowHide)').forEach(function (tr, i) {
         var D = tr.querySelectorAll('input.dtcol'), f = tr.querySelectorAll('input:not(.dtcol)'), z = i % 2 ? ZEBRA : '#fff';
-        ieRows.push([{ t: v(D[0]), bg: z }, { t: v(f[0]), bg: z }, { t: v(f[1]), al: 'right', bg: z }, { t: v(D[1]), bg: z }, { t: v(f[2]), bg: z }, { t: v(f[3]), al: 'right', bg: z }, { t: f[4] ? v(f[4]) : '', al: 'right', bg: z }]);
+        ieRows.push([{ t: v(D[0]), bg: z }, { t: v(f[0]), bg: z }, { t: v(f[1]), al: 'right', bg: z }, { t: v(D[1]), bg: z }, { t: v(f[2]), bg: z }, { t: v(f[3]), al: 'right', bg: z }]);
       });
-      ieRows.push([{ t: '합    계', cs: 2, bg: GOLD, wt: 800, color: NAVY }, { t: val('incSum'), al: 'right', bg: GOLD, wt: 800, color: NAVY }, { t: '합    계', cs: 2, bg: GOLD, wt: 800, color: NAVY }, { t: val('expSum'), al: 'right', bg: GOLD, wt: 800, color: NAVY }, { t: val('netFoot'), al: 'right', bg: GOLD, wt: 800, color: RED }]);
-      var ieTop = y; y = table(P, y, ieCols, ieRows, 34, 18); R(P - 1, ieTop - 1, TW + 2, y - ieTop + 2, null, 3); y += 22;
+      ieRows.push([{ t: '합    계', cs: 2, bg: GOLD, wt: 800, color: NAVY }, { t: val('incSum'), al: 'right', bg: GOLD, wt: 800, color: NAVY }, { t: '합    계', cs: 2, bg: GOLD, wt: 800, color: NAVY }, { t: val('expSum'), al: 'right', bg: GOLD, wt: 800, color: NAVY }]);
+      var ieTop = y; y = table(P, y, ieCols, ieRows, 34, 18); R(P - 1, ieTop - 1, TW + 2, y - ieTop + 2, null, 3);
+      (function (x, y0, y1) { ops.push(function () { g.strokeStyle = NAVY; g.lineWidth = 2; [-2.5, 2.5].forEach(function (d) { g.beginPath(); g.moveTo(x + d, y0); g.lineTo(x + d, y1); g.stroke(); }); }); })(P + TW / 2, ieTop, y);   // 가운데 두 줄 분리선
+      y += 22;
       // 은행 입출금 내역 (기업은행 · 농협 나란히)
       T('○ ' + txt($('titleBank')), P, y + 16, 24, 800, INK); y += 40;
       var titles = Array.prototype.map.call(RPT.querySelectorAll('.bankTopTitle'), txt), prevL = Array.prototype.map.call(RPT.querySelectorAll('.prevRow .label'), txt);
@@ -3523,8 +3600,9 @@ body{
       y = Math.max(bottoms[0], bottoms[1]) + 12; R(P - 1, bankTop - 1, TW + 2, y - bankTop + 2, null, 3); y += 20;
       // 주민 안내 (1가구당 보상금은 크게, 설명은 굵게)
       var X = shareCalc(), Bg = shareBig(X), sl = shareLines(X), lines = [];
-      sl.forEach(function (x) { g.font = font(21, 700); var line = '', nx = /^【다음 달/.test(x); ('· ' + x).split('').forEach(function (ch) { if (g.measureText(line + ch).width > TW - 30 && line) { lines.push({ t: line, nx: nx }); line = ch; } else line += ch; }); if (line) lines.push({ t: line, nx: nx }); });
-      var bigH = Bg ? 108 : 0, bh = 44 + bigH + lines.length * 32 + 14; R(P, y, TW, 40, BLUE); R(P, y, TW, bh, null, 2);
+      sl.forEach(function (x) { var nx = /^【다음 달/.test(x), px = nx ? 25 : 21; g.font = font(px, nx ? 800 : 700); var line = ''; ('· ' + x).split('').forEach(function (ch) { if (g.measureText(line + ch).width > TW - 30 && line) { lines.push({ t: line, nx: nx }); line = ch; } else line += ch; }); if (line) lines.push({ t: line, nx: nx }); });
+      var LH = function (l) { return l.nx ? 38 : 32; }, linesH = lines.reduce(function (a, l) { return a + LH(l); }, 0);   // 다음 달 예상 줄은 더 크게
+      var bigH = Bg ? 108 : 0, bh = 44 + bigH + linesH + 14; R(P, y, TW, 40, BLUE); R(P, y, TW, bh, null, 2);
       T('■ 주민 안내', P + 14, y + 21, 20, 800, NAVY);
       var yb = y + 48;
       if (Bg) {
@@ -3536,7 +3614,7 @@ body{
         T(Bg.sub, W / 2, yb + 76, fit(Bg.sub, 17, 700, TW - 50), 700, '#555', 'center');
         yb += bigH;
       }
-      lines.forEach(function (l, i) { T(l.t, P + 14, yb + 14 + i * 32, 21, 700, l.nx ? '#8a4b00' : INK); }); y += bh + 20;
+      var ly = yb - 2; lines.forEach(function (l) { ly += LH(l); T(l.t, P + 14, ly - LH(l) / 2, l.nx ? 25 : 21, l.nx ? 800 : 700, l.nx ? '#8a4b00' : INK); }); y += bh + 20;
       // 날짜 · 서명 상자 + 직인 (두 줄 그대로, 크기만 작게)
       var dTop = y, DH = 112; R(P, dTop, TW, DH, '#fff', 3);
       var dt = txt($('reportDateText')), sign = txt(RPT.querySelector('.signLine')), spx = fit(sign, 25, 800, TW - 120);
@@ -3592,15 +3670,15 @@ body{
       ], [16666, 16667, 16667], 2600));
       out.push(paraXml('● ' + txt($('titleIncomeExpense')), 11, 'L'));
       var rows = [
-        [{ t: '수  입', cs: 3, ch: 25, bf: 49 }, { t: '지  출', cs: 3, ch: 25, bf: 49 }, { t: '비  고', ch: 25, bf: 49 }],
-        [{ t: '날짜', ch: BOLD, bf: 49 }, { t: '적  요', ch: BOLD, bf: 49 }, { t: '금  액', ch: BOLD, bf: 49 }, { t: '날짜', ch: BOLD, bf: 49 }, { t: '적  요', ch: BOLD, bf: 49 }, { t: '금  액', ch: BOLD, bf: 49 }, { t: '', bf: 49 }]
+        [{ t: '수  입', cs: 3, ch: 25, bf: 49 }, { t: '지  출', cs: 3, ch: 25, bf: 49 }],
+        [{ t: '날짜', ch: BOLD, bf: 49 }, { t: '적  요', ch: BOLD, bf: 49 }, { t: '금  액', ch: BOLD, bf: 49 }, { t: '날짜', ch: BOLD, bf: 49 }, { t: '적  요', ch: BOLD, bf: 49 }, { t: '금  액', ch: BOLD, bf: 49 }]
       ];
-      RPT.querySelectorAll('#incomeExpenseTable tbody tr').forEach(function (tr) {
+      RPT.querySelectorAll('#incomeExpenseTable tbody tr:not(.rowHide)').forEach(function (tr) {
         var D = tr.querySelectorAll('input.dtcol'), f = tr.querySelectorAll('input:not(.dtcol)'), blankL = !f[0].value.trim() && !C.parseWon(f[1].value), blankR = !f[2].value.trim() && !C.parseWon(f[3].value);
-        rows.push([{ t: D[0] ? D[0].value : '', ch: 12 }, { t: f[0].value }, { t: blankL ? '' : f[1].value, al: 'R' }, { t: D[1] ? D[1].value : '', ch: 12 }, { t: f[2].value }, { t: blankR ? '' : f[3].value, al: 'R' }, { t: f[4] ? f[4].value : '' }]);
+        rows.push([{ t: D[0] ? D[0].value : '', ch: 12 }, { t: f[0].value }, { t: blankL ? '' : f[1].value, al: 'R' }, { t: D[1] ? D[1].value : '', ch: 12 }, { t: f[2].value }, { t: blankR ? '' : f[3].value, al: 'R' }]);
       });
-      rows.push([{ t: '합  계', cs: 2, ch: 25, bf: 49 }, { t: val('incSum'), al: 'R', ch: 25, bf: 49 }, { t: '합  계', cs: 2, ch: 25, bf: 49 }, { t: val('expSum'), al: 'R', ch: 25, bf: 49 }, { t: val('netFoot'), al: 'R', ch: 13, bf: 49 }]);
-      out.push(tableXml(rows, [3600, 11400, 7800, 3600, 11400, 7800, 4400], 1700));
+      rows.push([{ t: '합  계', cs: 2, ch: 25, bf: 49 }, { t: val('incSum'), al: 'R', ch: 25, bf: 49 }, { t: '합  계', cs: 2, ch: 25, bf: 49 }, { t: val('expSum'), al: 'R', ch: 25, bf: 49 }]);
+      out.push(tableXml(rows, [4400, 11800, 8800, 4400, 11800, 8800], 1700));   // 수입·지출 반반 (비고 없음)
       out.push(paraXml('', 9, 'C'));
       out.push(paraXml('● ' + txt($('titleBank')), 11, 'L'));
       // 은행 거래내역: 기업은행(왼쪽 5칸) + 농협(오른쪽 5칸)
@@ -3632,7 +3710,7 @@ body{
       out.push(paraXml('', 9, 'C'));
       var SX = shareCalc(), SB = shareBig(SX), shRows = [[{ t: '■ 주민 안내', al: 'L', ch: 25, bf: 49 }]];
       if (SB) shRows.push([{ t: SB.head + '   ' + SB.amt, ch: 11 }], [{ t: SB.sub, ch: 10 }]);
-      out.push(tableXml(shRows.concat(shareLines(SX).map(function (x) { return [{ t: '· ' + x, al: 'L', ch: 10 }]; })), [50000], 1300));
+      out.push(tableXml(shRows.concat(shareLines(SX).map(function (x) { return [{ t: '· ' + x, al: 'L', ch: /^【다음 달/.test(x) ? 40 : 10 }]; })), [50000], 1300));
       out.push(paraXml('', 9, 'C'));
       out.push(paraXml(txt($('reportDateText')), 29, 'C'));
       out.push(paraXml(txt(RPT.querySelector('.signLine')), 29, 'C'));
