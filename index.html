@@ -749,6 +749,13 @@ body{
   #ledger .cv-tbl td{ height:32px; }
   #ledger .cv-line{ font-size:17px; margin:4px 0 4px 10px; }
   #ledger .cv-del{ width:26px; height:24px; padding:0; border:1px solid #e4a3a0; background:#fff5f4; color:#b42318; border-radius:4px; cursor:pointer; }
+  #ledger .doc-prev{ max-width:860px; margin:10px auto 0; font-size:15px; line-height:1.75; border:1px solid #dde3ef; border-radius:8px; padding:14px 18px; background:#fff; }
+  #ledger .doc-prev p{ margin:0 0 4px; } #ledger .doc-prev .cv-title{ margin:4px 0 14px; }
+  #ledger .doc-tbl{ width:100%; margin:6px 0 10px; } #ledger .doc-tbl th{ background:#e8eef9; color:#1d2b5c; }
+  #ledger .doc-pb{ border:0; border-top:2px dashed #c62828; margin:16px 0; }
+  #ledger .doc-cover{ display:block; width:100%; max-width:520px; margin:0 auto; border:1px solid #dde3ef; }
+  #ledger .bd-form p{ margin:4px 0; line-height:2; } #ledger .bd-form input{ font:inherit; padding:1px 5px; border:1px solid var(--lg-btn-line); border-radius:3px; background:#fffef2; }
+  #ledger .bd-form input.w{ width:13em; }
   #ledger .jg-ch{ text-align:center; font-weight:900; color:#1d2b5c; margin:18px 0 8px; font-size:17px; }
   #ledger .jg-art{ margin:0 0 10px; line-height:1.7; font-size:15px; }
   #ledger .jg-art b{ color:#143a63; } #ledger .jg-art .pp{ display:block; padding-left:1.4em; text-indent:-1.4em; white-space:pre-line; }
@@ -841,6 +848,25 @@ body{
     #ledger .row-btns{ display:inline-flex; }
   }
 
+  /* PDF 저장 모드 (버튼이 body에 pm-… 를 붙이고 인쇄 창을 엶) */
+  #sec-print{ display:none; }
+  @media print{
+    body.pm-annual #report, body.pm-min #report, body.pm-board #report{ display:none !important; }
+    body.pm-report #ledger{ display:none !important; }
+    body.pm-report #report .stage{ padding:0 !important; overflow:visible; }
+    body.pm-report #report .sheetWrap{ left:0 !important; transform:none !important; margin:0 auto !important; zoom:var(--pz, .76); }   /* A4 한 장에 맞춤 */
+    body.pm-annual #ledger section.lsheet, body.pm-min #ledger section.lsheet, body.pm-board #ledger section.lsheet{ display:none !important; }
+    body.pm-annual #ledger section#sec-title,body.pm-annual #ledger section#sec-cover,body.pm-annual #ledger section#sec-toc,body.pm-annual #ledger section#sec-biz,body.pm-annual #ledger section#sec-cmp,body.pm-annual #ledger section#sec-audit,body.pm-annual #ledger section#sec-off,body.pm-annual #ledger section#sec-revenue,body.pm-annual #ledger section#sec-expense,body.pm-annual #ledger section#sec-items,body.pm-annual #ledger section#sec-summary,body.pm-annual #ledger section#sec-accounts,body.pm-annual #ledger section#sec-receipt,body.pm-annual #ledger section#sec-resol{ display:block !important; }
+    body.pm-annual #ledger section#sec-resol{ break-after:auto !important; page-break-after:auto !important; }
+    body.pm-holders #report, body.pm-notice #report, body.pm-proxy #report{ display:none !important; } body.pm-holders #ledger section.lsheet, body.pm-notice #ledger section.lsheet, body.pm-proxy #ledger section.lsheet{ display:none !important; }
+    body.pm-min #ledger section#sec-print, body.pm-board #ledger section#sec-print, body.pm-holders #ledger section#sec-print, body.pm-notice #ledger section#sec-print, body.pm-proxy #ledger section#sec-print{ display:block !important; break-after:auto !important; }
+    #sec-print .doc-prev{ border:0; padding:0; max-width:none; font-size:13pt; line-height:1.7; }   /* 본문 글자 13포인트 */
+    #sec-print .doc-cover{ max-width:none; width:100%; border:0; }
+    #sec-print .hp-tbl{ width:100%; border-collapse:collapse; font-size:11pt; } #sec-print .hp-tbl th, #sec-print .hp-tbl td{ border:1px solid #333; padding:4px 5px; } #sec-print .hp-tbl th{ background:#e8eef8; -webkit-print-color-adjust:exact; print-color-adjust:exact; } #sec-print .hp-tbl tr{ break-inside:avoid; }
+    input::placeholder, textarea::placeholder{ color:transparent !important; }   /* 빈 칸 안내 글씨는 인쇄 안 함 */
+    #sec-print .doc-pb{ border:0; margin:0; break-after:page; page-break-after:always; }
+    html, body{ background:#fff !important; }   /* 마지막 장 아래 회색 배경 없앰 */
+  }
   @media print{
     @page{ size:A4; margin:12mm; }
     .no-print{ display:none !important; }
@@ -1200,6 +1226,7 @@ body{
     <p class="eb-desc">위 결산 보고서를 <b>사진 한 장(PNG)</b>으로 만듭니다. 아이폰에서는 공유 창이 뜨면 <b>카카오톡</b>을 눌러 바로 보내거나 <b>「이미지 저장」</b>으로 사진첩에 저장하세요. (보고서 화면 모양 그대로 나옵니다)</p>
     <div class="eb-row">
       <button type="button" class="eb-btn" id="kkSave" style="background:#f2c200;color:#3a1d1d">📷 사진으로 저장 / 카톡 보내기</button>
+      <button type="button" class="eb-btn" data-pdf="report">📄 결산서 PDF로 저장</button>
     </div>
     <div class="eb-msg" id="kkMsg" aria-live="polite"></div>
   </section>
@@ -1223,6 +1250,7 @@ body{
   <!-- =========================================================
        💾 한글 파일로 저장 (원본 한글 양식 .hwpx 에 채워서 저장)
        ========================================================= -->
+
   <section id="hxBox" class="ebox no-print">
     <div class="eb-title">💾 한글 파일로 저장</div>
     <p class="eb-desc">원본 한글 양식 그대로 <b>SMP.REC 매출액 · 지출내역서 · 수입. 지출 · 현재통장 잔액 · 영수증</b>에 지금 장부 숫자를 채워 <b>.hwpx</b> 파일로 저장합니다.
@@ -1256,6 +1284,9 @@ body{
         <a href="#sec-chart">그래프</a>
         <a href="#sec-accounts">통장잔액</a>
         <a href="#sec-receipt">영수증</a>
+        <a href="#sec-notice">소집통지</a>
+        <a href="#sec-proxy">위임장</a>
+        <a href="#sec-board">이사회</a>
         <a href="#sec-jg">정관</a>
         <a href="#sec-holders">주주명부</a>
       </nav>
@@ -1372,6 +1403,18 @@ body{
         <div id="resolBox"></div>
       </section>
 
+      <section id="sec-notice" class="lsheet no-print">
+        <div id="noticeBox"></div>
+      </section>
+
+      <section id="sec-proxy" class="lsheet no-print">
+        <div id="proxyBox"></div>
+      </section>
+
+      <section id="sec-board" class="lsheet no-print">
+        <div id="boardBox"></div>
+      </section>
+
       <section id="sec-jg" class="lsheet no-print">
         <div id="jgBox"></div>
       </section>
@@ -1383,6 +1426,8 @@ body{
       <section id="sec-min" class="lsheet last">
         <div id="minBox"></div>
       </section>
+
+      <section id="sec-print" class="lsheet"></section>
 
       <section class="lsheet no-print danger-zone">
         <details>
@@ -2633,6 +2678,9 @@ body{
       renderShare();
       renderTitle();
       renderMinutes();
+      renderNotice();
+      renderProxy();
+      renderBoard();
       renderJg();
       renderHolders();
       renderBiz();
@@ -4654,7 +4702,7 @@ body{
       var v = titleData().date || '', m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
       return m ? { txt: m[1] + '년 ' + (+m[2]) + '월 ' + (+m[3]) + '일', no: v } : { txt: '년        월        일', no: '' };
     }
-    function drawTitlePage() {
+    function drawTitlePage(opt) {   // opt = {title, txt, no} (이사회 회의록 표지 등). 없으면 결산서 표지
       var S = 10, W = 187 * S, H = 262 * S;   // 글자 영역 187mm × 262mm (A4 한 장 안)
       var c = document.createElement('canvas'); c.width = W; c.height = H;
       var g = c.getContext('2d'), FONT = '"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif', NAVY = '#1f3a68';
@@ -4670,13 +4718,13 @@ body{
         });
         return sx + total;
       }
-      var D = titleDate();
+      var D = opt ? { txt: opt.txt, no: opt.no } : titleDate();
       // 문서번호
       if (D.no) { g.fillStyle = '#000'; g.font = '500 ' + (4 * S) + 'px ' + FONT; g.textAlign = 'right'; g.fillText('문서번호:  ' + D.no, W - 4 * S, 9 * S); g.textAlign = 'left'; }
       // 위 초록 줄: 왼쪽 굵은 연두 + 오른쪽 가는 줄
       g.fillStyle = '#9af55a'; g.fillRect(0, 16 * S, W * 0.44, 3.2 * S); g.fillRect(W * 0.44, 18.4 * S, W * 0.56, 0.6 * S);
       // 제목 (남색 굵게, 회색 그림자)
-      var tt = titleText(), px = Math.min(15 * S, (W * 0.9) / Math.max(8, tt.replace(/\s/g, '').length * 1.05 + (tt.split(' ').length - 1) * 0.6));
+      var tt = opt ? opt.title : titleText(), px = Math.min(15 * S, (W * 0.9) / Math.max(8, tt.replace(/\s/g, '').length * 1.05 + (tt.split(' ').length - 1) * 0.6));
       shadowText(tt, W / 2, 48 * S, px, px * 0.04, 'center');
       // 아래 초록 줄: 왼쪽 가는 줄 + 오른쪽 굵은 초록
       g.fillStyle = '#43963f'; g.fillRect(0, 65.6 * S, W * 0.57, 0.6 * S); g.fillRect(W * 0.57, 64 * S, W * 0.43, 3.2 * S);
@@ -4722,7 +4770,7 @@ body{
       var box = $('titleBox'); if (!box) return;
       if (!box.querySelector('#tpTitle')) {
         box.innerHTML = '<div class="tp-form no-print"><label>표지 제목 <input id="tpTitle"></label><label>총회 날짜 <input id="tpDate" type="date"></label>' +
-          '<label class="cv-add" style="display:inline-block;margin:0">✍ 결재란 그림 넣기<input type="file" id="tpAppr" accept="image/*" hidden></label> <button type="button" class="cv-del" id="tpApprDel" style="width:auto;padding:0 8px">결재란 빼기</button> <span id="tpApprMsg" class="bz-hint"></span></div><img class="tp-img" id="tpImg" alt="표지">' +
+          '<label class="cv-add" style="display:inline-block;margin:0">✍ 결재란 그림 넣기<input type="file" id="tpAppr" accept="image/*" hidden></label> <button type="button" class="cv-del" id="tpApprDel" style="width:auto;padding:0 8px">결재란 빼기</button> <span id="tpApprMsg" class="bz-hint"></span><br><button type="button" class="cv-add" data-pdf="annual" style="display:inline-block;margin-top:6px">📄 표지 ~ 이사회 결의서 PDF로 저장</button> <span class="bz-hint pdf-msg"></span></div><img class="tp-img" id="tpImg" alt="표지">' +
           '<p class="bz-hint no-print">한글 파일 맨 앞(결산 보고서를 넣으면 그 바로 뒤)에 이 모양으로 한 장 들어갑니다. 한글에서 글자를 직접 고칠 수도 있습니다. 제목을 비우면 「' + year + '년 정기주주총회 결산서」로 자동.</p>';
         box.addEventListener('change', function (e) {   // 결재란(대표이사 서명·감사 도장) 그림: 흰 여백을 잘라내고 줄여서 이 기기에만 저장
           if (e.target.id !== 'tpAppr') return;
@@ -4815,19 +4863,19 @@ body{
     }
     var INLINE = '<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>';
     // 표지: 글자는 한글에서 고칠 수 있는 진짜 글자, 초록 줄만 그림
-    function titleXml(files) {
+    function titleXml(files, opt) {
       if (!files || !addTitleCharPrs(files)) return '';
       ensureSeal(files);
       ['tpbar1', 'tpbar2'].forEach(function (id, i) {
         files.filter(function (f) { return f.name === 'BinData/' + id + '.png'; }).forEach(function (f) { files.splice(files.indexOf(f), 1); });
         addBin(files, id, canvasU8(drawBar(i === 0)));
       });
-      var D = titleDate(), T = TP_CH, out = '';
+      var D = opt ? { txt: opt.txt, no: opt.no } : titleDate(), T = TP_CH, out = '';
       function P(text, ch, para, pb) { return '<hp:p id="2147483648" paraPrIDRef="' + para + '" styleIDRef="0" pageBreak="' + (pb || 0) + '" columnBreak="0" merged="0"><hp:run charPrIDRef="' + ch + '"><hp:t>' + xe(text) + '</hp:t></hp:run></hp:p>'; }
       function blank(n) { var o = ''; for (var i = 0; i < n; i++) o += P('', T.title, 30); return o; }
       function bar(id, bin) { return '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="9">' + picXml(id, bin, 53000, 960, 2244, 40, INLINE, 'TOP_AND_BOTTOM', 902) + '<hp:t/></hp:run></hp:p>'; }
-      out += P(D.no ? '문서번호:  ' + D.no : ' ', 9, 27, 1);
-      out += bar(1237872101, 'tpbar1') + blank(1) + P(titleText(), T.title, 30) + blank(1) + bar(1237872102, 'tpbar2');
+      out += P(D.no ? '문서번호:  ' + D.no : ' ', 9, 27, opt && opt.first ? 0 : 1);
+      out += bar(1237872101, 'tpbar1') + blank(1) + P(opt ? opt.title : titleText(), T.title, 30) + blank(1) + bar(1237872102, 'tpbar2');
       out += blank(7) + P(D.txt, T.date, 30);
       if (db.apprImg && apprImgEl && apprImgEl.naturalWidth) {   // 결재란 그림 (날짜와 회사 이름 사이 가운데)
         var b64 = String(db.apprImg).split(',')[1], bin = atob(b64), u8 = new Uint8Array(bin.length);
@@ -4838,13 +4886,721 @@ body{
         if (ah > 9000) { ah = 9000; aw = Math.round(ah * pw / ph); }
         out += blank(2) + '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="9">' + picXml(1237872104, 'apprimg', aw, ah, pw, ph, INLINE, 'TOP_AND_BOTTOM', 904) + '<hp:t/></hp:run></hp:p>' + blank(1);
       } else out += blank(5);
+      return out + coSealXml(1237872103);
+    }
+    // 회사 이름(크게·굵게) + 「(인)」 위 회사 직인 — 표지와 문서 끝 공통 (addTitleCharPrs·ensureSeal 뒤에 부름)
+    function coSealXml(picId) {
+      var T = TP_CH, out = '';
       // 직인: 회사 이름 줄 바로 위 빈 줄에 걸어 두고 (인) 위로 내려 겹치게 (글자 뒤)
-      var seal = picXml(1237872103, 'sealimg', 6300, 6200, 293, 288,
+      var seal = picXml(picId, 'sealimg', 6300, 6200, 293, 288,
         '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="1500" horzOffset="44140"/>', 'BEHIND_TEXT', 903);   // 「(인)」 글자 한가운데 (한글 앱 화면에서 잰 위치)
       out += '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + T.title + '">' + seal + '<hp:t/></hp:run></hp:p>';
       out += '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + T.co + '"><hp:t>' + xe('염전마을주민발전주식회사') + '</hp:t></hp:run><hp:run charPrIDRef="' + T.date + '"><hp:t>' + xe('      (인)') + '</hp:t></hp:run></hp:p>';   // 가운데 맞춤. 글자 사이 빈칸 없이(글자 모양의 자간으로 벌림) → 책 제본 여백이 있어도 한 줄에 들어감
       return out;
     }
+
+    /* ══════════════════════════════════════════════════════════════════
+       공통 문서 틀: 문단 목록(blocks) 하나로 ① 사진(PNG, 13pt, 넘치면 여러 장) ② 한글 파일(따로 저장)을 만듦
+       block: {k:'title', t} 제목 띠 | {k:'p', t, ind, b, c, color} 문단 | {k:'gap'} 빈 줄 | {k:'tbl', rows, w, head} 표
+              {k:'sign', t, seal} 서명 줄(가운데, 굵게, seal=회사 직인) | {k:'right', t} 오른쪽 맞춤 | {k:'pb'} 새 장
+       ══════════════════════════════════════════════════════════════════ */
+    var DOC_FONT = '"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+    function docPages(blocks) {   // 'pb'로 나눈 덩어리
+      var pages = [[]];
+      blocks.forEach(function (b) { if (b.k === 'pb') pages.push([]); else pages[pages.length - 1].push(b); });
+      return pages.filter(function (p) { return p.length; });
+    }
+    function drawDocAt(blocks, px) {
+      var W = 1080, M = 46, TW = W - 2 * M, NAVY = '#1f3a68', LINE = '#2b3a55';
+      var c = document.createElement('canvas'), g = c.getContext('2d'), ops = [], breaks = [], LH = Math.round(px * 1.62), GAP = Math.round(px * 0.6), y = 30, IND = Math.round(px * 1.3);
+      function font(p, wt) { return (wt || 400) + ' ' + p + 'px ' + DOC_FONT; }
+      function wrap(t, maxW, p, wt) {
+        g.font = font(p, wt); var out = [];
+        String(t).split('\n').forEach(function (para) {
+          var line = '';
+          para.split('').forEach(function (ch) {
+            if (g.measureText(line + ch).width > maxW && line) {
+              var cut = line.lastIndexOf(' ');
+              if (cut > line.length * 0.6) { out.push(line.slice(0, cut)); line = line.slice(cut + 1) + ch; } else { out.push(line); line = ch; }
+            } else line += ch;
+          });
+          out.push(line);
+        });
+        return out.map(function (l, i) { return i ? l.replace(/^[\s　]+/, '') : l; });
+      }
+      blocks.forEach(function (b) {
+        if (b.k === 'title') {
+          var TH = Math.round(px * 3.4); (function (yy, t) { ops.push(function () { drawTitleBand(g, null, M, yy, TW, TH, t, DOC_FONT); }); })(y, b.t);
+          y += TH + 8 + GAP * 2; breaks.push(y); return;
+        }
+        if (b.k === 'gap') { y += b.half ? Math.round(LH / 2) : GAP + Math.round(LH / 3); breaks.push(y); return; }
+        if (b.k === 'coseal') {
+          var cpx = Math.round(px * 1.6), ipx = Math.round(px * 1.15);
+          (function (yy) { ops.push(function () {
+            var CO = '염 전 마 을 주 민 발 전 주 식 회 사', IN = '(인)';
+            g.font = font(cpx, 900); var cw = g.measureText(CO).width; g.font = font(ipx, 700); var iw = g.measureText(IN).width, sp = cpx * 0.8;
+            var x = (W - cw - sp - iw) / 2; g.textBaseline = 'middle'; g.textAlign = 'left';
+            g.font = font(cpx, 900); g.fillStyle = NAVY; g.fillText(CO, x, yy);
+            g.font = font(ipx, 700); g.fillStyle = '#000'; var ix = x + cw + sp; g.fillText(IN, ix, yy);
+            if (sealImgEl.complete && sealImgEl.naturalWidth) { var sw = cpx * 2.4; g.globalCompositeOperation = 'multiply'; g.drawImage(sealImgEl, ix + iw / 2 - sw / 2, yy - sw / 2, sw, sw); g.globalCompositeOperation = 'source-over'; }
+          }); })(y + LH);
+          y += LH * 2; breaks.push(y); return;
+        }
+        if (b.k === 'p' || b.k === 'sign' || b.k === 'right') {
+          var p = b.huge ? Math.round(px * 1.6) : b.k === 'sign' ? Math.round(px * 1.08) : (b.big ? Math.round(px * 1.15) : px), wt = b.k === 'sign' || b.b || b.huge ? 800 : 400;
+          var hang = 0; if (b.k === 'p' && !b.c && !/\n/.test(b.t) && /^[□○※●■◎-] /.test(b.t)) { g.font = font(p, wt); hang = g.measureText(b.t.slice(0, 2)).width; }   // 내어쓰기
+          var x0 = M + (b.ind || 0) * IND, ls = wrap(b.t, TW - (b.ind || 0) * IND - hang, p, wt), al = b.k === 'sign' || b.c || b.huge ? 'center' : (b.k === 'right' ? 'right' : 'left');
+          ls.forEach(function (l, i) {
+            (function (l, yy) { ops.push(function () { g.font = font(p, wt); g.fillStyle = b.color || (b.k === 'sign' || b.huge ? NAVY : '#111'); g.textBaseline = 'middle'; g.textAlign = al; g.fillText(l, al === 'center' ? W / 2 : (al === 'right' ? W - M : x0 + (i ? hang : 0)), yy); g.textAlign = 'left'; }); })(l, y + LH / 2);
+            y += b.huge ? Math.round(LH * 1.5) : LH; breaks.push(y);
+          });
+          if (b.seal) {   // 회사 직인: 마지막 줄 「(인)」 위
+            (function (yy, text, pp) { ops.push(function () {
+              var si = document.querySelector('.ceoStampBig'); si = si && si.complete && si.naturalWidth ? si : sealImgEl; if (!si || !si.complete || !si.naturalWidth) return;
+              g.font = font(pp, 800); var tw = g.measureText(text).width, iw = g.measureText('(인)').width, cx = W / 2 + tw / 2 - iw / 2, S2 = Math.round(pp * 2.6);
+              g.globalCompositeOperation = 'multiply'; g.drawImage(si, cx - S2 / 2, yy - S2 / 2, S2, S2); g.globalCompositeOperation = 'source-over';
+            }); })(y - LH / 2, ls[ls.length - 1], p);
+          }
+          if (b.after) y += GAP;
+          return;
+        }
+        if (b.k === 'tbl') {
+          var tot = b.w.reduce(function (a, v) { return a + v; }, 0), cols = b.w.map(function (v) { return TW * v / tot; }), PAD = 10, tp = Math.round(px * 0.92), tLH = Math.round(tp * 1.5), tTop = y;
+          b.rows.forEach(function (row, ri) {
+            var head = b.head && ri === 0, cells = [], x = M, ci = 0;
+            row.forEach(function (cell) {
+              var cs = cell.cs || 1, w = 0; for (var k = 0; k < cs; k++) w += cols[ci + k];
+              cells.push({ x: x, w: w, t: cell.t == null ? '' : String(cell.t), hd: head || cell.h, al: cell.al || (head || cell.h ? 'center' : 'left') }); x += w; ci += cs;
+            });
+            cells.forEach(function (cl) { cl.ls = wrap(cl.t, cl.w - PAD * 2, tp, cl.hd ? 800 : 400); });
+            var h = Math.max(1, Math.max.apply(null, cells.map(function (cl) { return cl.ls.length; }))) * tLH + PAD * 2, y0 = y;
+            cells.forEach(function (cl) {
+              ops.push(function () {
+                g.fillStyle = cl.hd ? '#e8eef9' : '#fff'; g.fillRect(cl.x, y0, cl.w, h); g.strokeStyle = LINE; g.lineWidth = 1.2; g.strokeRect(cl.x, y0, cl.w, h);
+                g.font = font(tp, cl.hd ? 800 : 400); g.fillStyle = cl.hd ? NAVY : '#111'; g.textBaseline = 'middle';
+                var top = y0 + (h - cl.ls.length * tLH) / 2;
+                cl.ls.forEach(function (l, li) { var ty = top + li * tLH + tLH / 2; if (cl.al === 'center') { g.textAlign = 'center'; g.fillText(l, cl.x + cl.w / 2, ty); g.textAlign = 'left'; } else if (cl.al === 'right') { g.textAlign = 'right'; g.fillText(l, cl.x + cl.w - PAD, ty); g.textAlign = 'left'; } else g.fillText(l, cl.x + PAD, ty); });
+              });
+            });
+            y += h; breaks.push(y);
+          });
+          (function (a, bb) { ops.push(function () { g.strokeStyle = NAVY; g.lineWidth = 2.5; g.strokeRect(M, a, TW, bb - a); }); })(tTop, y);
+          y += GAP; return;
+        }
+      });
+      c.width = W; c.height = Math.ceil(y + 40);
+      g.fillStyle = '#fff'; g.fillRect(0, 0, W, c.height);
+      ops.forEach(function (f) { f(); });
+      c._breaks = breaks;
+      return c;
+    }
+    function docImages(blocks) {   // 13pt 고정, 한 화면(1 : 1.95)을 넘으면 줄 사이에서 나눔, 여러 장이면 ( n / N )
+      var W = 1080, TARGET = Math.round(W * 1.95), FOOT = 70, TOP = 30, PX = Math.round(1080 / 187 * 13 * 0.3528), parts = [];
+      docPages(blocks).forEach(function (pg, pi) {
+        if (pg[0].k === 'cover') {   // 표지: 결산서 표지와 같은 그림을 한 화면에
+          var tp = drawTitlePage(pg[0]), cc = document.createElement('canvas'); cc.width = W; cc.height = TARGET - FOOT;
+          var gc = cc.getContext('2d'), sh = Math.round(W * tp.height / tp.width); gc.fillStyle = '#fff'; gc.fillRect(0, 0, W, cc.height);
+          gc.drawImage(tp, 0, 0, tp.width, tp.height, 0, Math.max(0, Math.round((cc.height - sh) / 2)), W, sh);
+          parts.push([cc, 0, cc.height]); return;
+        }
+        var c = drawDocAt(pg, PX), br = c._breaks || [], start = 0, first = pi === 0 && !parts.length;
+        if (c.height <= TARGET - (first ? 0 : FOOT)) { parts.push([c, 0, c.height]); return; }
+        while (start < c.height - 50) {
+          var room = TARGET - FOOT - (start ? TOP : 0), limit = start + room, end = c.height;
+          if (limit < c.height) { end = start; br.forEach(function (b) { if (b > start + 200 && b <= limit) end = b; }); if (end === start) end = limit; }
+          parts.push([c, start, end]); start = end;
+        }
+      });
+      if (parts.length === 1) return [parts[0][0]];
+      return parts.map(function (r, i) {
+        var top = r[1] ? TOP : 0, h = r[2] - r[1], o = document.createElement('canvas'); o.width = W; o.height = top + h + FOOT;
+        var g = o.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, o.height); g.drawImage(r[0], 0, r[1], W, h, 0, top, W, h);
+        g.font = '700 24px ' + DOC_FONT; g.fillStyle = '#1f3a68'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('( ' + (i + 1) + ' / ' + parts.length + ' )', W / 2, top + h + FOOT / 2);
+        return o;
+      });
+    }
+    // 한글 문단으로 (13pt: 보통 39, 굵게 40). files가 있으면 회사 직인을 「(인)」 위에
+    function pbFirst(x) { var i = x.indexOf('pageBreak="'); return i < 0 || x.charAt(i + 11) === '1' ? x : x.slice(0, i) + 'pageBreak="1"' + x.slice(i + 13); }   // 첫 문단만 새 쪽 (이미 새 쪽이면 그대로)
+    // 문서용 문단 모양: 들여쓰기를 「빈칸」이 아닌 「왼쪽 여백」으로 → 줄이 넘어가도 같은 자리에서 시작 (한글·한컴독스), 줄 간격 160%
+    var DOC_PP = [49, 50, 51, 52], DOC_IND = 2600;   // 들여쓰기 한 단계 = 약 2글자(13pt)
+    // 내어쓰기: 「□ 」「○ 」「※ 」는 1950, 「- 」는 1300 → 둘째 줄부터 기호 다음 글자에 맞춰 시작
+    var DOC_HANG = [0, 1950, 1300], DOC_PP_N = DOC_HANG.length * 4;
+    function docPP(lv, t) { var c = String(t).charAt(0), k = /[□○※●■◎]/.test(c) ? 1 : (c === '-' ? 2 : 0); return 49 + k * 4 + Math.min(3, lv || 0); }
+    // 본문 마지막 장이 휑하지 않게: 본문 높이를 어림해서 마지막 장이 절반 넘게 차도록 줄 간격(160~260%)을 고름 (이사회 회의록)
+    function docFillSpacing(blocks) {
+      var pbs = []; blocks.forEach(function (b, i) { if (b.k === 'pb') pbs.push(i); });
+      if (!pbs.length) return 160;
+      var body = blocks.slice(pbs[0] + 1, pbs.length > 1 ? pbs[pbs.length - 1] : blocks.length), PAGE = 84186 - 2 * 2835;
+      function lines(t, ind) {
+        var w = 53000 - (ind || 0) * DOC_IND;
+        return String(t).split('\n').reduce(function (a, ln) { var u = 0; for (var i = 0; i < ln.length; i++) u += ln.charCodeAt(i) >= 0x1100 ? 1300 : 700; return a + Math.max(1, Math.ceil(u * 1.04 / w)); }, 0);
+      }
+      function H(sp) {
+        return body.reduce(function (a, b) {
+          if (b.k === 'title') return a + 5800;
+          if (b.k === 'gap' || b.k === 'sign') return a + 1400;
+          if (b.k === 'tbl') return a + b.rows.length * 1600 + 1700;
+          if (b.k === 'p') return a + (b.c ? lines(b.t, 0) * 1400 : lines(b.t, b.ind) * Math.round(1300 * sp / 100) + 100) + (b.after ? 1100 : 0);
+          return a;
+        }, 0);
+      }
+      // 쪽 수는 그대로 두고, 마지막 장(폐회선언까지)이 88% 가까이 차도록 줄 간격을 130~260% 사이에서 가장 넓게
+      var base = Math.floor(H(160) / PAGE), best = 160, bestF = -1;
+      for (var sp = 130; sp <= 260; sp += 5) {
+        var h = H(sp), pg = Math.floor(h / PAGE), f = (h % PAGE) / PAGE;
+        if (pg === base && f <= 0.88 && f > bestF) { best = sp; bestF = f; }
+      }
+      if (bestF < 0) for (sp = 155; sp >= 120; sp -= 5) { h = H(sp); f = (h % PAGE) / PAGE; if (f <= 0.88) { best = sp; bestF = f; break; } }   // 넘칠 듯하면 좁힘
+      window.__docFill = { sp: best, frac: bestF, h: H(best) };
+      return best;
+    }
+    function addDocParaPrs(files, sp) {
+      if (!addKeepParaPrs(files)) return false;
+      var hf = files.filter(function (f) { return f.name === 'Contents/header.xml'; })[0], x = new TextDecoder().decode(hf.data);
+      if (x.indexOf('<hh:paraPr id="' + DOC_PP[0] + '"') >= 0) return x.indexOf('<hh:paraProperties itemCnt="' + (49 + DOC_PP_N) + '">') >= 0;
+      if (x.indexOf('<hh:paraProperties itemCnt="49">') < 0) return false;
+      var base = x.match(/<hh:paraPr id="31"[\s\S]*?<\/hh:paraPr>/); if (!base) return false;
+      var ids = []; for (var k = 0; k < DOC_PP_N; k++) ids.push(49 + k);
+      var add = ids.map(function (id) {
+        var lv = (id - 49) % 4, hg = DOC_HANG[Math.floor((id - 49) / 4)], L = lv * DOC_IND, t = base[0].replace('id="31"', 'id="' + id + '"').split('<hh:lineSpacing type="PERCENT" value="100" unit="HWPUNIT"/>').join('<hh:lineSpacing type="PERCENT" value="' + (sp || 160) + '" unit="HWPUNIT"/>');
+        var parts = t.split('<hp:default>');   // HwpUnitChar 쪽은 값이 절반 단위
+        var f = function (z, d) { return z.replace('<hc:intent value="0" unit="HWPUNIT"/>', '<hc:intent value="' + (-hg / d) + '" unit="HWPUNIT"/>').replace('<hc:left value="0" unit="HWPUNIT"/>', '<hc:left value="' + (L / d) + '" unit="HWPUNIT"/>'); };
+        return f(parts[0], 2) + (parts[1] != null ? '<hp:default>' + f(parts[1], 1) : '');
+      }).join('');
+      x = x.replace('<hh:paraProperties itemCnt="49">', '<hh:paraProperties itemCnt="' + (49 + DOC_PP_N) + '">').replace('</hh:paraProperties>', add + '</hh:paraProperties>');
+      hf.data = new TextEncoder().encode(x);
+      return true;
+    }
+    function docXml(blocks, files) {
+      var out = '', first = true, sealN = 0, needPB = false, at = 0, dpp = !!(files && addDocParaPrs(files, blocks.fillBody ? docFillSpacing(blocks) : 160));
+      blocks.forEach(function (b) {   // 'pb' 다음 첫 문단을 새 쪽에서 시작
+        if (needPB && out.length > at) { out = out.slice(0, at) + pbFirst(out.slice(at)); needPB = false; }
+        at = out.length;
+        if (b.k === 'pb') { first = false; needPB = true; return; }
+        if (b.k === 'coseal') {
+          if (files && addTitleCharPrs(files)) { ensureSeal(files); out += coSealXml(1237872190 + (sealN++)); }
+          else out += paraXml('염 전 마 을 주 민 발 전 주 식 회 사      (인)', 40, 'C');
+          first = false; return;
+        }
+        if (b.k === 'cover') {
+          var tx = titleXml(files, { title: b.title, txt: b.txt, no: b.no, first: first });
+          if (!tx) tx = paraXml('문서번호: ' + (b.no || ''), 39, 'L') + paraXml('', 39, 'C') + paraXml(b.title, 29, 'C') + paraXml('', 39, 'C') + paraXml(b.txt, 40, 'C') + paraXml('', 39, 'C') + paraXml('염전마을주민발전주식회사      (인)', 40, 'C');
+          out += tx; first = false; return;
+        }
+        if (b.k === 'title') { out += titleBlock(b.t, !first && out ? 1 : 0); first = false; return; }
+        first = false;
+        if (b.k === 'gap') { out += paraXml('', b.half ? 9 : 39, 'L'); return; }
+        if (b.k === 'p' && b.huge) { out += paraXml(b.t, 29, 'C'); return; }
+        if (b.k === 'p') {
+          if (dpp && !b.c) out += String(b.t).split('\n').map(function (ln) { return '<hp:p id="2147483648" paraPrIDRef="' + docPP(b.ind, ln) + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="' + (b.b ? 40 : 39) + '"><hp:t>' + xe(ln) + '</hp:t></hp:run></hp:p>'; }).join('');
+          else out += paraXml(new Array((b.ind || 0) * 2 + 1).join('  ') + b.t, b.b ? 40 : 39, b.c ? 'C' : 'L');
+          if (b.after) out += paraXml('', 9, 'L'); return;
+        }
+        if (b.k === 'right') { out += '<hp:p id="2147483648" paraPrIDRef="27" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="39"><hp:t>' + xe(b.t) + '</hp:t></hp:run></hp:p>'; return; }
+        if (b.k === 'sign') {
+          if (b.seal && files && addKeepParaPrs(files)) {   // 오른쪽 맞춤(오른쪽 여백) + 「(인)」 위 회사 직인
+            ensureSeal(files);
+            out += '<hp:p id="2147483648" paraPrIDRef="' + KEEP_PP.SIGN + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="39">' + sealPicXml(1237872601 + (sealN++), 53000 - SIGN_RM - 1100 - 2700, 150, 5400) + '<hp:t/></hp:run></hp:p>';
+            out += '<hp:p id="2147483648" paraPrIDRef="' + KEEP_PP.SIGN + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="40"><hp:t>' + xe(b.t) + '</hp:t></hp:run></hp:p>';
+          } else out += paraXml(b.t, 40, 'C');
+          return;
+        }
+        if (b.k === 'tbl') {
+          var tot = b.w.reduce(function (a, v) { return a + v; }, 0), ws = b.w.map(function (v) { return Math.round(50000 * v / tot); });
+          out += tableXml(b.rows.map(function (row, ri) { return row.map(function (cl) { var hd = (b.head && ri === 0) || cl.h; return { t: String(cl.t == null ? '' : cl.t).replace(/\s*\n\s*/g, ' '), cs: cl.cs, al: cl.al === 'right' ? 'R' : (cl.al === 'center' || hd ? null : 'L'), ch: hd ? 25 : 9, bf: hd ? 49 : 4 }; }); }), ws, 1600) + paraXml('', 9, 'L');
+        }
+      });
+      if (needPB && out.length > at) out = out.slice(0, at) + pbFirst(out.slice(at));
+      return out;
+    }
+    // 따로 저장하는 한글 파일: 원본 양식(template.hwpx)의 쪽 설정만 남기고 본문을 새로 채움
+    function saveDocHwpx(blocksFn, name, msg) {
+      if (typeof DecompressionStream === 'undefined') { if (msg) msg.textContent = '⚠ 이 브라우저는 한글 파일 만들기를 지원하지 않습니다.'; return; }
+      getTemplate().then(function (buf) {
+        if (!buf) { if (msg) msg.textContent = '⚠ 먼저 위 「한글(.hwpx)로 저장」에서 원본 양식 파일을 한 번 골라 주세요.'; return; }
+        if (msg) msg.textContent = '한글 파일을 만드는 중…';
+        return unzip(buf).then(function (files) {
+          var sf = files.filter(function (f) { return f.name === 'Contents/section0.xml'; })[0]; if (!sf) throw new Error('한글 양식 파일이 아닙니다');
+          var doc = new DOMParser().parseFromString(new TextDecoder().decode(sf.data), 'application/xml'), sec = doc.documentElement;
+          var ps = kids(sec, 'p'), keep = ps.filter(function (p) { return p.getElementsByTagNameNS(HP, 'secPr').length; })[0];
+          Array.prototype.slice.call(sec.childNodes).forEach(function (n) { if (n !== keep) sec.removeChild(n); });
+          if (keep) Array.prototype.slice.call(keep.getElementsByTagNameNS(HP, 'pageNum')).forEach(function (pn) { var ctrl = pn.parentNode; ctrl.parentNode.removeChild(ctrl); });   // 쪽 번호는 뺌
+          useMalgun(files);
+          var body = docXml(blocksFn(), files);
+          var frag = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '" xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core">' + body + '</root>', 'application/xml');
+          if (frag.getElementsByTagName('parsererror').length) throw new Error('문서 변환 오류');
+          Array.prototype.slice.call(frag.documentElement.childNodes).forEach(function (n) { sec.appendChild(doc.importNode(n, true)); });
+          sf.data = new TextEncoder().encode('<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + new XMLSerializer().serializeToString(doc).replace(/^<\?xml[^>]*\?>\s*/, ''));
+          var mt = files.filter(function (f) { return f.name === 'mimetype'; });
+          return zip(mt.concat(files.filter(function (f) { return f.name !== 'mimetype'; })));
+        }).then(function (blob) {
+          var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+          setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+          if (msg) msg.textContent = '✔ ' + name + ' 저장 완료 — 한글에서 열면 됩니다.';
+        });
+      }).catch(function (err) { if (msg) msg.textContent = '⚠ 저장하지 못했습니다: ' + err.message; });
+    }
+    function docButtons(id) {
+      return '<p class="no-print"><button type="button" class="cv-add" data-docpng="' + id + '" style="display:inline-block">📷 사진으로 저장</button> ' +
+        '<button type="button" class="cv-add" data-dochwp="' + id + '" style="display:inline-block">💾 한글(.hwpx)로 저장</button> ' + '<button type="button" class="cv-add" data-pdf="' + id + '" style="display:inline-block">📄 PDF로 저장</button> ' + '<span class="bz-hint" id="docMsg-' + id + '"></span></p>';
+    }
+    function docPreview(blocks) {   // 화면 미리보기 (인쇄 안 함)
+      var h = '<div class="doc-prev">';
+      blocks.forEach(function (b) {
+        if (b.k === 'pb') { h += '<hr class="doc-pb">'; return; }
+        if (b.k === 'cover') { var src = ''; try { src = drawTitlePage(b).toDataURL('image/png'); } catch (e) { } h += '<img class="doc-cover" alt="표지" src="' + src + '">'; return; }
+        if (b.k === 'title') { h += '<div class="cv-title">' + esc(b.t) + '</div>'; return; }
+        if (b.k === 'gap') { h += '<div style="height:' + (b.half ? '.35em' : '.6em') + '"></div>'; return; }
+        if (b.k === 'p' || b.k === 'right') { var hg = b.k === 'p' && !b.c && !/\n/.test(b.t) && /^[□○※●■◎-] /.test(b.t) ? (b.t.charAt(0) === '-' ? 0.85 : 1.3) : 0; h += '<p style="padding-left:' + ((b.ind || 0) * 1.3 + hg) + 'em;text-indent:-' + hg + 'em;' + (b.huge ? 'font-size:1.6em;text-align:center;color:#1f3a68;margin:.4em 0;' : '') + (b.b || b.huge ? 'font-weight:800;' : '') + (b.c ? 'text-align:center;' : '') + (b.k === 'right' ? 'text-align:right;' : '') + (b.color ? 'color:' + b.color + ';' : '') + (b.after ? 'margin-bottom:.7em;' : '') + '">' + esc(b.t).replace(/\n/g, '<br>') + '</p>'; return; }
+        if (b.k === 'coseal') { h += '<p style="text-align:center;font-size:1.6em;font-weight:900;color:#1f3a68;letter-spacing:.12em;margin:.6em 0;white-space:nowrap">염전마을주민발전주식회사&nbsp;&nbsp;<span style="position:relative;display:inline-block;font-size:.75em;color:#000;letter-spacing:0">(인)<img src="' + sealImgEl.src + '" alt="" style="position:absolute;left:50%;top:50%;width:2.6em;transform:translate(-50%,-50%);mix-blend-mode:multiply;opacity:.9"></span></p>'; return; }
+        if (b.k === 'sign') { h += '<p style="text-align:center;font-weight:900;color:#1f3a68;white-space:pre-wrap">' + esc(b.t) + '</p>'; return; }
+        if (b.k === 'tbl') {
+          h += '<table class="grid doc-tbl">' + b.rows.map(function (row, ri) { return '<tr>' + row.map(function (cl) { var hd = (b.head && ri === 0) || cl.h; return '<' + (hd ? 'th' : 'td') + (cl.cs ? ' colspan="' + cl.cs + '"' : '') + ' style="text-align:' + (cl.al || (hd ? 'center' : 'left')) + '">' + esc(cl.t == null ? '' : cl.t).replace(/\n/g, '<br>') + '</' + (hd ? 'th' : 'td') + '>'; }).join('') + '</tr>'; }).join('') + '</table>';
+        }
+      });
+      return h + '</div>';
+    }
+    var DOC_DEF = {};   // id → { blocks(), name(), title }
+    document.addEventListener('click', function (e) {
+      var t = e.target, id = t.getAttribute && (t.getAttribute('data-docpng') || t.getAttribute('data-dochwp')); if (!id || !DOC_DEF[id]) return;
+      var D = DOC_DEF[id], msg = document.getElementById('docMsg-' + id);
+      try {
+        if (t.getAttribute('data-docpng')) shareCanvases(docImages(D.blocks()), D.name() + '.png', D.title, msg);
+        else saveDocHwpx(D.blocks, D.name() + '.hwpx', msg);
+      } catch (err) { if (msg) msg.textContent = '⚠ 만들지 못했습니다: ' + err.message; }
+    });
+    function wdayOf(iso) { var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); if (!m) return ''; return '일월화수목금토'.charAt(new Date(+m[1], +m[2] - 1, +m[3]).getDay()) + '요일'; }
+    function dateTxt(iso, blank) { var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? m[1] + '년 ' + (+m[2]) + '월 ' + (+m[3]) + '일' : (blank || '      년      월      일'); }
+    function timeTxt(hm) {   // '11:00' → '오전 11시', '13:30' → '오후 1시 30분'
+      var m = String(hm || '').match(/^(\d{1,2}):(\d{2})/); if (!m) return '';
+      var h = +m[1], mi = +m[2]; return (h < 12 ? '오전 ' : '오후 ') + (h % 12 === 0 ? 12 : h % 12) + '시' + (mi ? ' ' + mi + '분' : '');
+    }
+    function officers() {   // 결산 앞장 「조직과 인원현황」 → [{role, name, addr}]
+      return cover().members.filter(function (m) { return m[0] || m[1]; }).map(function (m) {
+        var hd = holderByName(m[1]), adr = String((hd && hd.a) || m[2] || '').trim();   // 주소는 주주명부에 있으면 그것(더 정확), 없으면 결산 앞장 명단
+        if (/^백수(로|하사리)/.test(adr)) adr = '백수읍 ' + adr.replace(/^백수(?=하사리)/, '');
+        if (adr && /^(백수|염산)/.test(adr)) adr = '전라남도 영광군 ' + adr;
+        return { role: String(m[0] || '').replace(/\s+/g, ''), name: String(m[1] || '').replace(/\s+/g, ''), addr: adr };
+      });
+    }
+    function spaced(n) { return String(n || '').split('').join(' '); }
+
+    /* ══════════════════ ① 이사회 의사록 (매월) ══════════════════
+       보내 주신 「11월 이사회 회의록」 양식 그대로 + 바로잡은 점:
+       · 정족수: 정관 제35조 제1항 「이사 과반수의 출석과 출석이사 과반수」 (예전 문구의 「이사정수의 과반수 찬성」은 정관과 다름)
+       · 임원 현황: 재적 이사·감사는 결산 앞장 명단에서, 출석은 체크로 (예전 표의 재적이사 6인·재적감사 0인 오류)
+       · 기명날인: 정관 제36조 제2항 「의장과 출석한 이사 및 감사」, 출석한 사람만, 주민등록번호는 넣지 않음
+       · 숫자: 결산서 장부(전달 통장잔액·수입·지출)와 다음 달 예상(보상금 1,750만 원 등)에서 자동 */
+    function boardData() {
+      if (!db.board) db.board = {};
+      var now = new Date(), ym = now.getFullYear() + '-' + pad(now.getMonth() + 1);
+      var cur = db.boardCur && db.boardCurAt === ym ? db.boardCur : ym;   // 달이 바뀌면 그달 회의록으로 자동 이동
+      if (!db.board[cur]) {
+        var y = +cur.slice(0, 4), m = +cur.slice(5, 7);
+        var prevK = Object.keys(db.board).filter(function (k) { return k < cur; }).sort().pop(), P0 = prevK && db.board[prevK];
+        if (P0) {   // 지난 회의록을 그대로 이어받고 「달」만 바꿈
+          var pm = +prevK.slice(5, 7), dd = Math.min(+(String(P0.date || '').slice(8, 10) || 1), new Date(y, m, 0).getDate()) || 1;
+          var NB = JSON.parse(JSON.stringify(P0));
+          NB.date = y + '-' + pad(m) + '-' + pad(dd); NB.docNo = y + '-' + pad(m); NB.notice = ''; NB.inc = ''; delete NB.agText;
+          NB.agendas = (P0.agendas || []).map(function (q) { return String(q || '').replace(new RegExp('(^|[^0-9])' + pm + '월', 'g'), '$1' + m + '월'); });
+          db.board[cur] = NB;
+        } else db.board[cur] = { date: y + '-' + pad(m) + '-01', start: '11:00', end: '11:30', place: '하사6구마을회관', skip: true, notice: '', absent: {}, per: 500000, inc: '', no: '반대', agendas: [m + '월 주민 피해보상금 지급에 관한 건', '기타 안건'], etc: '안건 제시가 없어 심의를 마쳤다', seal3: '', nay: 0, docNo: y + '-' + pad(m) };
+      }
+      return { key: cur, B: db.board[cur] };
+    }
+    function boardNums(key, B) {
+      var Y = +key.slice(0, 4), Mn = +key.slice(5, 7), PY = Mn === 1 ? Y - 1 : Y, PM = Mn === 1 ? 12 : Mn - 1, d = db.years[PY];
+      var bal = d ? C.balanceThrough(db, PY, PM) : 0, inc = d ? C.revenueMonth(d, PM) : 0, items = {}, etc = 0, tot = 0, others = {}, oOrder = [];
+      ((d && d.expense && d.expense[PM]) || []).forEach(function (r) {
+        var a = Number(r && r.amount) || 0; if (!a) return; tot += a;
+        var k = monthlyItemOf(r.item); if (k) { items[k] = (items[k] || 0) + a; return; }
+        var nm = String(r.item || '').trim();
+        if (a >= 1000000 && nm) { if (!(nm in others)) { others[nm] = 0; oOrder.push(nm); } others[nm] += a; } else etc += a;   // 100만 원 이상은 이름대로 따로, 나머지는 기타
+      });
+      // 이번 달 예상 지출: 보상금(1가구당 금액 × 몫) + 기타 50만 원 + 송전료·수당·회계사(바로 전 달) + 그 달 정해진 큰 지출
+      var S = shareInfo(), units = (+S.hh || 0) + (+S.extra || 0), comp = (parseInt(String(B.per).replace(/\D/g, ''), 10) || 0) * units;
+      var fixed = 0; ['송전료', '수당', '회계사'].forEach(function (k) {
+        for (var b2 = 0; b2 < 24; b2++) { var mm = PM - b2, yy = PY; while (mm < 1) { mm += 12; yy--; } var dd = db.years[yy], t = monthTotals((dd && dd.expense && dd.expense[mm]) || []); if (t[k]) { fixed += t[k]; return; } }
+      });
+      var big = nextBigExpenses(PY, PM), bigSum = big.list.reduce(function (a, e) { return a + (e.amt || 0); }, 0);
+      var expN = comp + NEXT_ETC + fixed + bigSum, incN = String(B.inc).trim() === '' ? (S.nextInc && S.nextInc[PY + '-' + PM]) : parseInt(String(B.inc).replace(/\D/g, ''), 10);
+      incN = incN == null || incN === '' ? null : Number(incN) || 0;
+      return { Y: Y, M: Mn, PY: PY, PM: PM, bal: bal, inc: inc, items: items, etc: etc, tot: tot, others: oOrder.map(function (n) { return [n, others[n]]; }), units: units, comp: comp, big: big, expN: expN, incN: incN, balN: incN == null ? null : bal + incN - expN };
+    }
+    // 안건 이름 → 이사회 회의 내용 (보내 주신 회의록 말투: □ 큰 항목, ○ 작은 항목, - 세부). 정관 조항은 이사회 의결 사항(제34조) 기준
+    function boardAgendaLines(q, no, X) {
+      var t = String(q || '').replace(/\s+/g, ''), L = [], b = function (s2, ind) { L.push({ t: s2, ind: ind }); }, w = C.formatWon;
+      var N = X.N, ceo = X.ceo, gi = X.gi, ny = (X.N.Y + 1) + '년도';
+      var open = '□ ' + ceo + ' 대표이사가 제' + no + '호 의안 「' + q + '」' + josa(q, '을', '를') + ' 부의안건으로 상정하고 토의하였다.';
+      var VOTE = X.nay ? '출석이사 ' + X.dIn + '명 중 찬성 ' + X.yes + '명, 반대 ' + X.nay + '명으로 정관 제35조 제1항에 따라 원안대로 ' + (X.pass ? '가결하였다.' : '부결되었다.')
+                       : '출석이사 ' + X.dIn + '명 전원이 만장일치로 찬성하여 정관 제35조 제1항에 따라 원안대로 가결하였다.';
+      if (/기타/.test(t)) { b('□ ' + ceo + ' 대표이사가 기타 안건을 질문하자 ' + (X.etc || '안건 제시가 없어 회의를 마무리하였다') + (/[.]$/.test(X.etc || '') ? '' : '.'), 1); return L; }
+      if (/보상/.test(t)) {
+        b(open, 1);
+        b('○ ' + N.PM + '월 통장잔액 : ' + w(N.bal) + '원', 2);
+        b('○ ' + N.PM + '월 총수입액 : ' + w(N.inc) + '원', 2);
+        b('○ ' + N.PM + '월 지출 (합계 ' + w(N.tot) + '원)', 2);
+        [['수당', '대표·감사 수당'], ['송전료', '송전료'], ['보상금', '보상금'], ['회계사', '회계사(세무사) 수수료']].forEach(function (k) { if (N.items[k[0]]) b('- ' + k[1] + ' : ' + w(N.items[k[0]]) + '원', 3); });
+        N.others.forEach(function (o) { b('- ' + o[0] + ' : ' + w(o[1]) + '원', 3); });
+        if (N.etc) b('- 기 타 : ' + w(N.etc) + '원', 3);
+        b('○ ' + N.M + '월 예상 수입액 : ' + (N.incN == null ? '약 　　　　만 원' : '약 ' + rough(N.incN)), 2);
+        b('○ ' + N.M + '월 예상 총지출액 : 약 ' + rough(N.expN) + (N.big.list.length ? ' (' + N.big.list.map(function (e) { return e.name; }).join('·') + ' 포함)' : ''), 2);
+        b('○ ' + N.M + '월 예상 통장잔액 : ' + (N.balN == null ? '약 　　　　만 원' : '약 ' + rough(N.balN)), 2);
+        b('※ 참고사항 ※', 1);
+        b('○ 1가구당 ' + rough(X.per).replace(/^약 /, '') + ' 지급 시 지급 총액 : ' + w(N.comp) + '원 (주주 ' + X.S.hh + '가구' + (+X.S.extra ? ' 및 ' + X.S.name + ' ' + X.S.extra + '몫' : '') + ', 총 ' + N.units + '몫)', 2);
+        b('○ ' + rough(X.per).replace(/^약 /, '') + ' 지급 시 예상 잔액 : ' + (N.balN == null ? '약 　　　　만 원' : '약 ' + rough(N.balN)), 2);
+        b('□ ' + ceo + ' 대표이사가 월 수입금액과 대략적인 지출금액을 이사들에게 보고하고 1가구당 보상금 ' + rough(X.per).replace(/^약 /, '') + '을 지급하자고 제안하자, ' + VOTE, 1);
+        return L;
+      }
+      b(open, 1);
+      if (/주주총회|총회/.test(t) && /소집|개최/.test(t)) {
+        var P = minParts(), Mm = minData(), D = titleDate();
+        b('○ 정관 제16조 제2항 및 제34조 제7호에 따라 제' + gi + '기 정기주주총회를 아래와 같이 소집하기로 함.', 2);
+        b('- 일 시 : ' + (D.no ? D.txt + ' ' + wdayOf(D.no) : '　　년　　월　　일') + ' ' + (Mm.time || ''), 3);
+        b('- 장 소 : ' + (Mm.place || ''), 3);
+        b('- 보고 사항 : 제' + gi + '기 영업보고, 감사보고', 3);
+        b('- 결의 사항 : ' + [P.q].concat(P.extra.map(function (x) { return x.q; })).map(function (x) { return String(x).replace(/ \((보통|특별)결의\)$/, ''); }).join(', '), 3);
+        b('○ 소집 통지는 정관 제17조 제1항에 따라 총회일 10일 전까지 각 주주에게 서면(또는 동의한 주주에게 전자문서)으로 발송하기로 함.', 2);
+      } else if (/결산|재무제표|영업보고/.test(t)) {
+        var O = fsOfficial(X.N.Y - (X.N.M <= 3 ? 1 : 0)) || fsOfficial(year), sm = C.summarize(db, year);
+        b('○ 정관 제39조 제1항 및 제34조 제2호에 따라 제' + gi + '기(' + year + '.01.01 ~ ' + year + '.12.31) 재무제표(재무상태표·손익계산서·이익잉여금처분계산서)와 영업보고서를 이사회에 제출하고 그 내용을 설명함.', 2);
+        b('- 매출(입금)액 : ' + w(sm.totalIncome) + '원, 지출액 : ' + w(sm.totalExpense) + '원', 3);
+        if (O) b('- 당기순이익 : ' + w(O.meta.ni) + '원, 차기이월 미처분이익잉여금 : ' + w(O.meta.re) + '원 (배당 없음)', 3);
+        b('- 통장 잔액 : ' + w(sm.balance) + '원', 3);
+        b('○ 위 서류는 감사의 감사를 받아 정기주주총회에 제출하고, 총회 2주 전부터 본점에 비치하기로 함(정관 제39조).', 2);
+      } else if (/사업계획|예산/.test(t)) {
+        b('○ 정관 제34조 제2호에 따라 ' + ny + ' 사업계획과 수입·지출 예산(안)을 별첨 자료에 따라 항목별로 설명함.', 2);
+        b('- 예상 수입 : 약 　　　　만 원 (SMP·REC 전력 판매)', 3);
+        b('- 예상 지출 : 약 　　　　만 원 (주민 피해보상금 약 ' + rough(N.comp * 12) + ' 포함)', 3);
+        b('○ 사업계획과 예산(안)은 정기주주총회에 보고(제출)하기로 함.', 2);
+      } else if (/정관/.test(t)) {
+        b('○ 정관 제34조 제3호에 따라 정기주주총회에 제출할 정관 변경안을 설명함.', 2);
+        var ch = []; (minData().extra || []).forEach(function (x) { if (/정관/.test(String(x.q || ''))) ch = ch.concat(jgChanges(x).filter(function (c) { return c.after; })); });
+        if (ch.length) ch.forEach(function (c) { b('- ' + c.label + ' : 「' + String(c.before == null ? '(신설)' : c.before).replace(/\s*\n\s*/g, ' ') + '」 → 「' + String(c.after).replace(/\s*\n\s*/g, ' ') + '」', 3); });
+        else b('- 정관 제○조 제○항 : 「현행 ○○○○」 → 「개정 ○○○○」', 3);
+        b('○ 정관 변경은 주주총회 특별결의 사항(정관 제20조 제3항)이므로 정기주주총회에 부의하기로 함.', 2);
+      } else if (/대표이사/.test(t) && /선임|해임|후보/.test(t)) {
+        b('○ 대표이사 ○○○의 임기가 ○○○○년 ○○월 ○○일로 만료(또는 사임)됨에 따라 후임 대표이사 후보로 ○○○을(를) 추천함.', 2);
+        b('○ 정관 제27조에 따라 대표이사는 주주총회에서 선임하므로 정기주주총회 안건으로 부의하기로 함.', 2);
+      } else if (/(이사|감사|임원)/.test(t) && /선임|해임|후보|사임|퇴임/.test(t)) {
+        b('○ ' + (/감사/.test(t) ? '감사' : '이사') + ' ○○○의 임기 만료(또는 사임)에 따라 후보자로 ○○○을(를) 추천함. 임기는 정관 제24조에 따름.', 2);
+        b('○ 정관 제23조에 따라 이사와 감사는 주주총회에서 선임' + (/해임/.test(t) ? '·해임(특별결의, 정관 제20조 제3항)' : '') + '하므로 정기주주총회 안건으로 부의하기로 함.', 2);
+      } else if (/보수|수당/.test(t)) {
+        b('○ 현행 임원 보수(정관 제30조 제2항) : ' + String(jgText(30, 2) || '').replace(/\s+/g, ' '), 2);
+        b('○ ' + ny + ' 임원 보수(안) : 대표 월 ○○○원, 감사 월 ○○○원, 이사 ○○○', 2);
+        b('○ 정관 제30조 제1항에 따라 임원 보수는 주주총회 의결로 정하므로 정기주주총회 안건으로 부의하기로 함.', 2);
+      } else if (/규정|사규|내규|세칙/.test(t)) {
+        b('○ 정관 제34조 제6호 및 제44조에 따라 「○○○○ 규정」의 제정(개정) 이유와 주요 내용을 설명함.', 2);
+        b('- 주요 내용 : ○○○○', 3);
+        b('- 시행일 : ○○○○년 ○○월 ○○일', 3);
+      } else if (/소송|화해|분쟁/.test(t)) {
+        b('○ 정관 제34조 제10호에 따라 ○○○○ 관련 소송의 제기(또는 화해)에 관하여 경위와 예상 비용을 설명함.', 2);
+        b('- 상대방 : ○○○, 청구 내용 : ○○○○, 예상 비용 : ○○○원', 3);
+      } else if (/계약|위탁|운영사/.test(t)) {
+        b('○ 정관 제34조 제12호에 따라 발전소 운영 관련 계약의 주요 내용을 설명함.', 2);
+        b('- 계약 상대방 : ○○○○, 계약 기간 : ○○○○년 ○○월부터 ○○개월, 계약 금액 : ○○○원', 3);
+      } else if (/찬조|후원|기부|행사|야유회|상품권/.test(t)) {
+        b('○ 마을 행사 등에 대한 지원의 목적과 내용을 설명함.', 2);
+        b('- 지원 대상 : ○○○○, 지원 금액 : ○○○원, 지급 시기 : ○○월 ○○일', 3);
+        b('○ 지급 후 예상 통장잔액 : ' + (N.balN == null ? '약 　　　　만 원' : '약 ' + rough(N.balN) + ' (지원 금액 차감 전)'), 2);
+      } else if (/차입|대출|자금/.test(t)) {
+        b('○ 자금 차입의 필요성과 조건을 설명함.', 2);
+        b('- 차입처 : ○○○○, 금액 : ○○○원, 이자율 : 연 ○○%, 상환 방법 : ○○○○', 3);
+      } else if (/취득|처분|매입|매각|구입|공사|수리|설비/.test(t)) {
+        b('○ 정관 제34조 제9호에 따라 해당 자산의 취득(처분)·공사의 필요성과 내용을 설명함.', 2);
+        b('- 대상 : ○○○○, 업체 : ○○○○, 금액 : ○○○원, 시기 : ○○월', 3);
+      } else {
+        b('○ 안건의 취지와 주요 내용을 설명함.', 2);
+        b('- 주요 내용 : ○○○○', 3);
+      }
+      b('□ 의장이 이사들에게 의견을 물은 바 별다른 이의가 없어 표결에 부친 결과, ' + VOTE, 1);
+      return L;
+    }
+    function boardCtx() {
+      var R = boardData(), B = R.B, N = boardNums(R.key, B), O = officers(), O2 = fsOfficial(year);
+      var ceo = O.filter(function (o) { return /대표/.test(o.role); })[0] || { role: '대표이사', name: '', addr: '' };
+      var dirs = O.filter(function (o) { return /이사/.test(o.role); }), auds = O.filter(function (o) { return /감사/.test(o.role); });
+      var att = function (o) { return !(B.absent || {})[o.name]; }, dIn = dirs.filter(att), nay = parseInt(B.nay, 10) || 0, yes = dIn.length - nay;
+      return { R: R, B: B, N: N, O: O, ceoO: ceo, ceo: ceo.name, dirs: dirs, auds: auds, dInL: dIn, aInL: auds.filter(att), dIn: dIn.length, nay: nay, yes: yes, pass: yes * 2 > dIn.length,
+        per: parseInt(String(B.per).replace(/\D/g, ''), 10) || 0, S: shareInfo(), etc: B.etc, gi: O2 ? O2.meta.gi : year - 2018 };
+    }
+    function boardAgendaText(i, X) {   // 화면 칸에 보이는 글 (직접 고쳤으면 그 글)
+      var B = X.B, man = (B.agText || {})[i];
+      if (man != null && String(man).trim()) return String(man);
+      return boardAgendaLines(B.agendas[i], i + 1, X).map(function (l) { return l.t; }).join('\n');
+    }
+    // 보내 주신 「11월 이사회 회의록」 틀 그대로: 간날인란 → 문서번호 → 표지(제목·날짜·회사) → 본문 1~6 → 의결 → 기명날인 → 회사명
+    function boardBlocks() {
+      var X = boardCtx(), B = X.B, N = X.N, ceoO = X.ceoO, ceo = X.ceo, dirs = X.dirs, auds = X.auds, dIn = X.dInL, aIn = X.aInL;
+      var dOut = dirs.filter(function (o) { return dIn.indexOf(o) < 0; }), aOut = auds.filter(function (o) { return aIn.indexOf(o) < 0; });
+      var ag = (B.agendas || []).map(function (q, i) { return { q: String(q || '').trim(), i: i }; }).filter(function (x) { return x.q; });
+      var bl = [], P = function (t, ind, o) { var b = { k: 'p', t: t, ind: ind || 0 }; if (o) for (var k in o) b[k] = o[k]; bl.push(b); };
+      var s3 = String(B.seal3 || '').trim() || dIn.filter(function (o) { return o !== ceoO; }).slice(0, 3).map(function (o) { return o.name; }).join(', ');
+      // ── 표지
+      // 표지: 정기주주총회 결산서 표지와 같은 모양 (제목의 달만 바뀜)
+      bl.push({ k: 'cover', title: X.R.key.slice(0, 4) + '년 ' + N.M + '월 이사회 회의록', txt: dateTxt(B.date), no: B.docNo || '' });
+      bl.push({ k: 'pb' });
+      // ── 본문
+      bl.push({ k: 'title', t: N.M + '월 이사회 회의록' });   // 주주총회 의사록과 같은 제목 띠 (달만 바뀜)
+      var HD = { b: true, color: '#143a63' };   // 큰 항목(1.~6.) = 의사록의 안건 제목처럼 굵은 남색
+      var st = timeTxt(B.start), et = timeTxt(B.end); if (st && et && st.slice(0, 2) === et.slice(0, 2)) et = et.slice(3);
+      P('1. 일시', 0, HD); P(dateTxt(B.date) + ' ' + wdayOf(B.date) + ' ' + st + (et ? ' ∼ ' + et : ''), 1);
+      P(B.skip ? '(회의 소집 통보일 : 정관 제33조에 따라 이사, 감사 전원의 동의로 소집 절차 생략)' : '(회의 소집 통보일 : ' + dateTxt(B.notice, '　　년　　월　　일') + ', 정관 제33조에 따라 회의일 2일 전 각 이사 및 감사에게 통지)', 1);
+      P('2. 장소', 0, HD); P(B.place || '', 1);
+      P('3. 임원 출석 현황', 0, HD);
+      P('□ 임원 현황', 1);
+      bl.push({ k: 'tbl', head: true, w: [1, 1, 1, 1], rows: [
+        [{ t: '이사정수' }, { t: '재적이사' }, { t: '감사정수' }, { t: '재적감사' }],
+        [{ t: '3인 이상', al: 'center' }, { t: dirs.length + '인', al: 'center' }, { t: '1인 이상', al: 'center' }, { t: auds.length + '인', al: 'center' }]] });
+      P('□ 출석 현황', 1);
+      P('○ 참석임원 : ' + [ceoO].filter(function (o) { return dIn.indexOf(o) >= 0; }).map(function (o) { return o.name + ' 대표이사'; })
+        .concat(dIn.filter(function (o) { return o !== ceoO; }).length ? [dIn.filter(function (o) { return o !== ceoO; }).map(function (o) { return o.name; }).join(', ') + ' 이사'] : [])
+        .concat(aIn.length ? [aIn.map(function (o) { return o.name; }).join(', ') + ' 감사'] : []).join(', ') + ' (이사 ' + dIn.length + '명' + (aIn.length ? ', 감사 ' + aIn.length + '명' : '') + ')', 2);
+      if (dOut.length || aOut.length) P('○ 불참임원 : ' + dOut.concat(aOut).map(function (o) { return o.name + ' ' + o.role; }).join(', '), 2);
+      P('4. 안건', 0, HD);
+      ag.forEach(function (a, k) { P('제' + (k + 1) + '호 의안 : ' + a.q, 1); });
+      P('5. 회의내용', 0, HD);
+      P('□ ' + ceo + ' 대표이사가 의장석에 앉아 본인의 이름을 시작으로 ' + dIn.filter(function (o) { return o !== ceoO; }).map(function (o) { return o.name; }).join(', ') + ' 이사 순으로 일일이 출석을 점호하고 총 ' + dIn.length + '명 출석하였음을 공지함' + (aIn.length ? '(감사 ' + aIn.map(function (o) { return o.name; }).join(', ') + ' 참석)' : '') + '.', 1);
+      P('□ 이어 염전마을주민발전주식회사 정관 제35조 제1항의 규정에 의한 의사정족수와 의결정족수에 대하여 구체적으로 설명하고 이사회가 적법하게 성립되었음을 공지함.', 1);
+      P('○ 「염전마을주민발전주식회사 정관 제35조 제1항은 이사회의 결의를 이사 과반수의 출석과 출석이사 과반수의 찬성으로 하도록 규정하고 있어, 재적이사 ' + dirs.length + '명 중 ' + dIn.length + '명 참석으로 의사정족수를 ' + (dIn.length * 2 > dirs.length ? '충족함' : '충족하지 못함') + '」', 2);
+      P('□ 대표이사 ' + ceo + josa(ceo, '은', '는') + ' 염전마을주민발전주식회사 이사회의 개최를 선언함.', 1);
+      ag.forEach(function (a) {
+        var txt = boardAgendaText(a.i, X);
+        txt.split('\n').forEach(function (line) { var l = line.trim(); if (!l) return; P(l, /^□|^※/.test(l) ? 1 : /^○/.test(l) ? 2 : /^-/.test(l) ? 3 : 2); });
+      });
+      P('6. 폐회선언', 0, HD);
+      if (s3) P('□ ' + ceo + ' 대표이사가 ' + s3 + ' 이사를 간날인 이사로 지정함.', 1);
+      P('□ ' + ceo + ' 대표이사가 염전마을주민발전주식회사 이사회 폐회를 공식 공표함(' + timeTxt(B.end) + ').', 1);
+      bl.push({ k: 'pb' });   // 「위와 같이 의결함」부터 서명란까지는 새 장에 한꺼번에
+      bl.push({ k: 'gap' });
+      P('위와 같이 의결함', 0, { c: true, b: true });
+      P(dateTxt(B.date), 0, { c: true, b: true });
+      P('위 결의를 명확히 하기 위하여 이 의사록을 작성하고 의장과 출석한 이사 및 감사는 다음에 기명날인한다(정관 제36조 제2항).', 0);
+      bl.push({ k: 'gap' });
+      var SG = dIn.concat(aIn), sgGap = SG.length <= 6 ? 3 : SG.length <= 8 ? 2 : 1;   // 도장 찍을 자리: 사람 사이를 벌림 (적으면 두 줄, 많으면 한 줄)
+      SG.forEach(function (o, i) {
+        bl.push({ k: 'sign', t: (o === ceoO ? '대표이사' : o.role) + ':   ' + spaced(o.name) + '            (인)' });
+        if (o.addr) { bl.push({ k: 'gap', half: true }); P(o.addr, 0, { c: true, color: '#444' }); }   // 이름과 주소 사이도 조금 띄움
+        if (i < SG.length - 1) for (var g = 0; g < sgGap; g++) bl.push({ k: 'gap' });
+      });
+      for (var g2 = 0; g2 < sgGap + 2; g2++) bl.push({ k: 'gap' });   // 명단 아래 넉넉히 띄우고
+      bl.push({ k: 'coseal' });   // 회사 이름 크게·굵게 + (인) 위에 회사 직인 (표지와 같은 모양)
+      bl.fillBody = true;   // 한글 파일: 본문 마지막 장이 절반 넘게 차도록 줄 간격 자동
+      // 문단 나누기 (주주총회 의사록처럼): 큰 항목·□ 문단·※ 앞에서 한 칸 띄움
+      bl.forEach(function (b, i) {
+        var nx = bl[i + 1]; if (b.k !== 'p' || !nx) return;
+        if (nx.k === 'tbl' || (nx.k === 'p' && (nx.color === '#143a63' || /^[□※]/.test(nx.t)) && !(b.color === '#143a63'))) b.after = true;
+      });
+      return bl;
+    }
+    function renderBoard() {
+      var box = $('boardBox'); if (!box || box.contains(document.activeElement)) return;
+      var X = boardCtx(), R = X.R, B = X.B, O = X.O, N = X.N;
+      var keys = Object.keys(db.board).sort().reverse();
+      var inp = function (k, ph, cls, type) { return '<input data-bd="' + k + '"' + (type ? ' type="' + type + '"' : '') + (cls ? ' class="' + cls + '"' : '') + ' placeholder="' + (ph || '') + '" value="' + esc(B[k] == null ? '' : B[k]) + '">'; };
+      var h = '<div class="cv-title">이 사 회 회 의 록</div>' +
+        '<p class="bz-hint no-print">보내 주신 「11월 이사회 회의록」 틀 그대로 만듭니다. 안건 이름을 적으면 그 안건에 맞는 회의 내용이 자동으로 들어가고(직접 고칠 수 있음, 다 지우면 다시 자동), 보상금 안건에는 장부의 <b>전달</b> 통장잔액·수입·지출과 이번 달 예상이 자동으로 들어갑니다. 정족수 문구는 정관 제35조 제1항에 맞게 고쳤고, 주민등록번호는 넣지 않습니다.</p>' +
+        '<div class="no-print bd-form">' +
+        '<p>회의 달 <input type="month" id="bdMonth" value="' + R.key + '"> ' + (keys.length > 1 ? '<span class="bz-hint">저장된 회의: ' + keys.map(esc).join(', ') + '</span>' : '') + ' · 문서번호 ' + inp('docNo', '2026-11') + '</p>' +
+        '<p>일시 ' + inp('date', '', '', 'date') + ' ' + inp('start', '11:00', '', 'time') + ' ∼ ' + inp('end', '11:30', '', 'time') + ' · 장소 ' + inp('place', '하사6구마을회관', 'w') + '</p>' +
+        '<p><label><input type="checkbox" data-bd="skip"' + (B.skip ? ' checked' : '') + '> 이사·감사 전원 동의로 소집 절차 생략 (정관 제33조)</label>' + (B.skip ? '' : ' · 소집 통보일 ' + inp('notice', '', '', 'date')) + '</p>' +
+        '<p><b>출석</b> ' + O.map(function (o) { var ab = (B.absent || {})[o.name]; return '<label style="margin-right:8px"><input type="checkbox" data-bdatt="' + esc(o.name) + '"' + (ab ? '' : ' checked') + '> ' + esc(o.role) + ' ' + esc(o.name) + '</label>'; }).join('') + '</p>' +
+        '<p>1가구당 보상금 ' + inp('per', '500,000') + '원 (' + N.units + '몫 → 총 ' + C.formatWon(N.comp) + '원) · ' + N.M + '월 예상 수입 ' + inp('inc', N.incN == null ? '예상 수입' : C.formatWon(N.incN)) + '원 · 반대 ' + inp('nay', '0') + '명</p>' +
+        '<p>기타 안건 결과 ' + inp('etc', '안건 제시가 없어 회의를 마무리하였다', 'w') + ' · 간날인 이사 ' + inp('seal3', '비우면 출석 이사 앞 3명', 'w') + '</p>' +
+        (B.agendas || []).map(function (q, i) {
+          var man = (B.agText || {})[i] != null && String(B.agText[i]).trim();
+          return '<div class="mn-ex"><p class="mn-q">' + (i + 1) + '호 의안 : <input class="w" data-bdag="' + i + '" placeholder="예: 12월 주민 피해보상금 지급에 관한 건" value="' + esc(q) + '"> <button type="button" class="cv-del" data-bdagdel="' + i + '" title="이 안건 지우기">－</button>' + (man ? ' <span class="bz-hint">직접 고친 문장 (다 지우면 다시 자동)</span>' : '') + '</p>' +
+            '<textarea class="cv-purpose" data-bdtx="' + i + '" rows="6">' + esc(q ? boardAgendaText(i, X) : '') + '</textarea></div>';
+        }).join('') +
+        '<p><button type="button" class="cv-add" id="bdAgAdd" style="display:inline-block">＋ 안건 추가</button> <span class="bz-hint">예: 정기주주총회 소집의 건, 제8기 결산 승인의 건, 2027년도 사업계획 및 예산 승인의 건, 정관 변경안 승인의 건, 마을 행사 찬조의 건</span></p></div>' +
+        docButtons('board') + docPreview(boardBlocks());
+      box.innerHTML = h;
+    }
+    DOC_DEF.board = { title: '이사회 회의록', blocks: boardBlocks, name: function () { var R = boardData(); return R.key.slice(0, 4) + '년_' + (+R.key.slice(5, 7)) + '월_이사회_회의록'; } };
+    (function () {
+      var box = $('boardBox'); if (!box) return;
+      box.addEventListener('input', function (e) {
+        var el = e.target, k = el.getAttribute('data-bd'), R = boardData(), B = R.B;
+        if (el.id === 'bdMonth') { if (/^\d{4}-\d{2}$/.test(el.value)) { var nw = new Date(); db.boardCur = el.value; db.boardCurAt = nw.getFullYear() + '-' + pad(nw.getMonth() + 1); saveSoon(); } return; }
+        if (k) { B[k] = el.type === 'checkbox' ? el.checked : el.value; saveSoon(); if (el.type === 'checkbox') { el.blur(); renderBoard(); } return; }
+        var ai = el.getAttribute('data-bdag');
+        if (ai != null) {   // 안건 이름: 직접 고친 문장이 없으면 회의 내용을 새로 만듦
+          B.agendas[+ai] = el.value; B.agText = B.agText || {};
+          var man = B.agText[+ai] != null && String(B.agText[+ai]).trim();
+          if (!man) { var ta = box.querySelector('textarea[data-bdtx="' + ai + '"]'); if (ta) ta.value = el.value.trim() ? boardAgendaText(+ai, boardCtx()) : ''; }
+          saveSoon(); return;
+        }
+        var ti = el.getAttribute('data-bdtx');
+        if (ti != null) { B.agText = B.agText || {}; if (el.value.trim()) B.agText[+ti] = el.value; else delete B.agText[+ti]; saveSoon(); }
+      });
+      box.addEventListener('change', function (e) {
+        var n = e.target.getAttribute('data-bdatt'); if (n == null) { if (e.target.id === 'bdMonth') { e.target.blur(); renderBoard(); } return; }
+        var B = boardData().B; B.absent = B.absent || {}; if (e.target.checked) delete B.absent[n]; else B.absent[n] = true;
+        save(); e.target.blur(); renderBoard();
+      });
+      box.addEventListener('click', function (e) {
+        var B = boardData().B, d = e.target.getAttribute('data-bdagdel');
+        if (e.target.id === 'bdAgAdd') { B.agendas.push(''); save(); e.target.blur(); renderBoard(); var qs = box.querySelectorAll('input[data-bdag]'); if (qs.length) qs[qs.length - 1].focus(); return; }
+        if (d != null) {   // 안건을 지우면 뒤 안건의 직접 고친 문장도 한 칸씩 당김
+          var T = B.agText || {}, NT = {}; B.agendas.splice(+d, 1);
+          Object.keys(T).forEach(function (k2) { var k3 = +k2; if (k3 < +d) NT[k3] = T[k2]; else if (k3 > +d) NT[k3 - 1] = T[k2]; }); B.agText = NT;
+          save(); e.target.blur(); renderBoard();
+        }
+      });
+      box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) renderBoard(); }, 0); });
+    })();
+
+    /* ══════════════════ ② 정기주주총회 소집통지서 (정관 제16조·제17조, 상법 제363조) ══════════════════
+       일시·장소·안건은 정기주주총회 의사록에서 그대로 가져옴. 총회일 10일 전까지 발송(정관 제17조 제1항) */
+    function noticeData() { if (!db.notice) db.notice = { sent: '' }; return db.notice; }
+    function noticeBlocks() {
+      var M = minData(), P = minParts(), D = titleDate(), O = fsOfficial(year), gi = O ? O.meta.gi : year - 2018, Nd = noticeData(), ceo = ceoName();
+      var bl = [], p = function (t, ind, o) { var b = { k: 'p', t: t, ind: ind || 0 }; if (o) for (var k in o) b[k] = o[k]; bl.push(b); };
+      bl.push({ k: 'title', t: '제' + gi + '기 정기주주총회 소집 통지서' });
+      p('주주 여러분께', 0, { b: true });
+      p('주주 여러분의 가정에 건강과 행복이 가득하시기를 바랍니다.', 1);
+      p('상법 제363조와 정관 제16조 및 제17조에 따라 제' + gi + '기 정기주주총회를 아래와 같이 개최하오니 꼭 참석하여 주시기 바랍니다.', 1, { after: true });
+      p('- 아      래 -', 0, { c: true, b: true });
+      p('1. 일    시 : ' + (D.no ? D.txt + ' ' + wdayOf(D.no) : '　　년　　월　　일') + ' ' + (M.time || ''), 0);
+      p('2. 장    소 : ' + (M.place || ''), 0);
+      p('3. 회의 목적 사항', 0);
+      p('가. 보고 사항 : 제' + gi + '기 영업보고, 감사보고', 1);
+      p('나. 결의 사항', 1);
+      p(P.q.replace(/ \((보통|특별)결의\)$/, ''), 2);
+      P.extra.forEach(function (x) { p(String(x.q).replace(/ \((보통|특별)결의\)$/, ''), 2); });
+      var hasJg = (M.extra || []).some(function (x) { return /정관/.test(String(x.q || '')) && jgChanges(x).some(function (c) { return c.after; }); });
+      if (hasJg) p('※ 정관 변경의 내용은 별첨 「정관 변경 대비표」를 참고하여 주십시오.', 2, { color: '#7a3e00' });
+      p('4. 의결권 행사 안내', 0);
+      p('가. 의결권은 1주마다 1개입니다(정관 제21조 제1항).', 1);
+      p('나. 직접 참석하기 어려운 주주께서는 동봉한 위임장을 작성하여 대리인이 총회 당일 표결 전에 의장에게 제출하면 의결권을 행사할 수 있습니다(정관 제21조 제2항).', 1);
+      p('5. 참석하실 때 가져오실 것', 0);
+      p('가. 주주 본인 : 신분증', 1);
+      p('나. 대리인 : 위임장, 대리인 신분증' + (P.extra.some(function (x) { return x.reg; }) ? ', 위임인(주주)의 인감증명서와 인감 날인' : ''), 1, { after: true });
+      p(dateTxt(Nd.sent, '　　년　　월　　일'), 0, { c: true, b: true });
+      bl.push({ k: 'sign', t: '염전마을주민발전주식회사   대표이사   ' + spaced(ceo) + '   (인)', seal: true });
+      return bl;
+    }
+    function renderNotice() {
+      var box = $('noticeBox'); if (!box || box.contains(document.activeElement)) return;
+      var D = titleDate(), Nd = noticeData(), warn = '';
+      if (D.no && Nd.sent) { var days = Math.round((new Date(D.no) - new Date(Nd.sent)) / 86400000); warn = days >= 10 ? '<span class="check ok">✔ 총회 ' + days + '일 전 발송 (정관 제17조: 10일 전까지)</span>' : '<span class="check warn">⚠ 총회 ' + days + '일 전 — 정관 제17조는 총회일 10일 전까지 통지해야 합니다 (주주 전원 동의가 있으면 단축 가능)</span>'; }
+      box.innerHTML = '<div class="cv-title">정기주주총회 소집 통지서</div>' +
+        '<p class="bz-hint no-print">총회 날짜는 표지의 「총회 날짜」, 시각·장소·안건은 아래 「정기주주총회 의사록」에서 그대로 가져옵니다.</p>' +
+        '<p class="no-print">발송일 <input type="date" id="ntSent" value="' + esc(Nd.sent || '') + '"> ' + warn + '</p>' +
+        docButtons('notice') + docPreview(noticeBlocks());
+    }
+    DOC_DEF.notice = { title: '정기주주총회 소집 통지서', blocks: noticeBlocks, name: function () { var O = fsOfficial(year), gi = O ? O.meta.gi : year - 2018; return '제' + gi + '기_정기주주총회_소집통지서'; } };
+    (function () {
+      var box = $('noticeBox'); if (!box) return;
+      box.addEventListener('change', function (e) { if (e.target.id !== 'ntSent') return; noticeData().sent = e.target.value; save(); e.target.blur(); renderNotice(); });
+    })();
+
+    /* ══════════════════ ③ 위임장 (정관 제21조 제2항) ══════════════════
+       주주명부의 이름·생년월일·주소·주식 수를 넣어 한 사람씩, 또는 전원(한 사람에 한 장) */
+    function proxyBlocks(who) {
+      var D = titleDate(), M = minData(), P = minParts(), O = fsOfficial(year), gi = O ? O.meta.gi : year - 2018, H = holders().filter(function (h) { return String(h.n || '').trim(); });
+      var list = who === '*' ? H : (who ? H.filter(function (h) { return String(h.n).replace(/\s+/g, '') === who; }) : [null]);
+      if (!list.length) list = [null];
+      var bl = [];
+      list.forEach(function (h, i) {
+        if (i) bl.push({ k: 'pb' });
+        var sh = h ? parseInt(String(h.s || '').replace(/\D/g, ''), 10) || 0 : 0, adr = h ? String(h.a || '') : '';
+        if (/^백수(로|하사리)/.test(adr)) adr = '백수읍 ' + adr.replace(/^백수(?=하사리)/, '');
+        if (/^(백수읍|염산면)/.test(adr)) adr = '전라남도 영광군 ' + adr;
+        bl.push({ k: 'title', t: '위   임   장' });
+        bl.push({ k: 'p', t: '본인은 염전마을주민발전주식회사 제' + gi + '기 정기주주총회(' + (D.no ? D.txt + ' ' + wdayOf(D.no) : '　　년　　월　　일') + ' ' + (M.time || '') + ', ' + (M.place || '') + ')에서 아래 대리인에게 본인 소유 주식의 의결권 행사에 관한 일체의 권한을 위임합니다(상법 제368조 제2항, 정관 제21조 제2항).', ind: 0, after: true });
+        bl.push({ k: 'tbl', w: [1.4, 3.6], rows: [
+          [{ t: '위임인 (주주)', cs: 2, h: true }],
+          [{ t: '성    명', h: true }, { t: h ? String(h.n).replace(/\s+/g, '') : '' }],
+          [{ t: '생년월일', h: true }, { t: h && h.b ? birthOf(h.b) : '' }],
+          [{ t: '주    소', h: true }, { t: adr }],
+          [{ t: '소유 주식', h: true }, { t: sh ? '보통주 ' + sh + '주 (의결권 ' + sh + '개)' : '보통주        주 (의결권        개)' }]] });
+        bl.push({ k: 'tbl', w: [1.4, 3.6], rows: [
+          [{ t: '대리인', cs: 2, h: true }],
+          [{ t: '성    명', h: true }, { t: '' }],
+          [{ t: '생년월일', h: true }, { t: '' }],
+          [{ t: '주    소', h: true }, { t: '' }],
+          [{ t: '주주와의 관계', h: true }, { t: '' }]] });
+        bl.push({ k: 'p', t: '위임 사항', b: true, ind: 0 });
+        bl.push({ k: 'p', t: '1. 아래 회의 목적 사항에 대한 의결권 행사 일체', ind: 1 });
+        bl.push({ k: 'p', t: P.q.replace(/ \((보통|특별)결의\)$/, ''), ind: 2 });
+        P.extra.forEach(function (x) { bl.push({ k: 'p', t: String(x.q).replace(/ \((보통|특별)결의\)$/, ''), ind: 2 }); });
+        bl.push({ k: 'p', t: '2. 총회 당일 위 안건의 수정·변경 및 회의 진행(연기·속행)에 관한 의결권 행사', ind: 1, after: true });
+        bl.push({ k: 'p', t: '      년      월      일', c: true, b: true });
+        bl.push({ k: 'sign', t: '위임인(주주)   ' + (h ? spaced(String(h.n).replace(/\s+/g, '')) : '　　　　　') + '   (인)' });
+        bl.push({ k: 'gap' });
+        bl.push({ k: 'p', t: '염전마을주민발전주식회사 대표이사 귀하', b: true, ind: 0 });
+        bl.push({ k: 'p', t: '※ 첨부 : 위임인 신분증 사본' + (P.extra.some(function (x) { return x.reg; }) ? ', 위임인 인감증명서(등기할 안건이 있어 공증 때 필요)' : '') + '. 대리인은 총회 당일 표결 전에 이 위임장을 의장에게 내 주십시오.', ind: 0, color: '#555' });
+      });
+      return bl;
+    }
+    function proxyWho() { return (db.proxyWho == null ? '' : db.proxyWho); }
+    function renderProxy() {
+      var box = $('proxyBox'); if (!box || box.contains(document.activeElement)) return;
+      var H = holders().filter(function (h) { return String(h.n || '').trim(); }), cur = proxyWho();
+      box.innerHTML = '<div class="cv-title">위 임 장</div>' +
+        '<p class="bz-hint no-print">주주명부에서 이름을 고르면 그 주주의 이름·생년월일·주소·주식 수가 들어갑니다. 「주주 전원」을 고르면 한 사람에 한 장씩 모두 만듭니다(한글 파일은 한 파일, 사진은 여러 장).</p>' +
+        '<p class="no-print">주주 <select id="pxWho"><option value="">빈 위임장 (직접 적기)</option><option value="*"' + (cur === '*' ? ' selected' : '') + '>주주 전원 (' + H.length + '장)</option>' +
+        H.map(function (h) { var n = String(h.n).replace(/\s+/g, ''); return '<option value="' + esc(n) + '"' + (cur === n ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></p>' +
+        docButtons('proxy') + docPreview(proxyBlocks(cur === '*' ? (H[0] ? String(H[0].n).replace(/\s+/g, '') : '') : cur)) + (cur === '*' && H.length > 1 ? '<p class="bz-hint no-print" style="text-align:center">(첫 번째 주주만 미리 보여 줍니다. 저장하면 ' + H.length + '명 모두 만들어집니다)</p>' : '');
+    }
+    // 정기주주총회 의사록 → 문단 목록 (PDF용, 한글 파일 의사록과 같은 내용) + 정관 변경 대비표
+    function minutesBlocks() {
+      var P = minParts(), bl = [], p = function (t, o) { var b = { k: 'p', t: t, ind: 0 }; if (o) for (var k in o) b[k] = o[k]; bl.push(b); };
+      bl.push({ k: 'title', t: P.title });
+      p('   ' + P.lead, { after: true });
+      P.head.forEach(function (x) { p(x); });
+      bl.push({ k: 'gap' }); p('   ' + P.open, { after: true });
+      [{ q: P.q, body: P.body }].concat(P.extra).forEach(function (x) { p(x.q, { b: true, color: '#143a63' }); p(x.body, { ind: 1, after: true }); });
+      p('   ' + P.close); p('   ' + P.end, { after: true });
+      p(P.date, { c: true, b: true }); bl.push({ k: 'sign', t: '염전마을주민발전주식회사' }); bl.push({ k: 'gap' });
+      bl.push({ k: 'sign', t: '의장  ' + P.ceo[0] + '   ' + P.ceo[1] + '   (인)' });
+      for (var i = 0; i < P.others.length; i += 2) bl.push({ k: 'sign', t: P.others.slice(i, i + 2).map(function (a) { return a[0] + '   ' + a[1] + '   (인)'; }).join('          ') });
+      var M = minData(), rows = [];
+      (M.extra || []).forEach(function (x) { if (/정관/.test(String(x.q || ''))) jgChanges(x).filter(function (c) { return c.after; }).forEach(function (c) { rows.push([{ t: c.label, al: 'center' }, { t: c.before == null ? '(신설)' : c.before }, { t: c.after }]); }); });
+      if (rows.length) {
+        var O = fsOfficial(year), gi = O ? O.meta.gi : year - 2018;
+        bl.push({ k: 'pb' }); bl.push({ k: 'title', t: '정관 변경 대비표' });
+        p('제' + gi + '기 정기주주총회 「정관 변경의 건」 별첨', { c: true, b: true });
+        bl.push({ k: 'tbl', head: true, w: [1.2, 3, 3], rows: [[{ t: '조 항' }, { t: '현 행' }, { t: '개 정 안' }]].concat(rows) });
+      }
+      return bl;
+    }
+    // PDF 저장: 해당 부분만 보이게 표시를 붙이고 인쇄 창을 엶 (파일 이름 = 문서 제목)
+    function printPdf(mode, btn) {
+      var R2 = reportYM(), O = fsOfficial(year), gi = O ? O.meta.gi : year - 2018, title = {
+        report: R2.y + '년_' + R2.m + '월_결산보고서',
+        annual: year + '년_정기주주총회_결산서',
+        min: '제' + gi + '기_정기주주총회_의사록',
+        board: (function () { var B = boardData(); return B.key.slice(0, 4) + '년_' + (+B.key.slice(5, 7)) + '월_이사회_회의록'; })(),
+        holders: '주주명부_' + year,
+        notice: '제' + gi + '기_정기주주총회_소집통지서',
+        proxy: DOC_DEF.proxy ? DOC_DEF.proxy.name() : '위임장'
+      }[mode];
+      if (mode === 'report') {   // 결산서: 가로 920px 보고서를 A4 한 장(186mm × 273mm ≈ 703 × 1030px)에 맞게 줄임
+        var wr = document.getElementById('sheetWrap'), Hh = wr ? wr.offsetHeight : 1300;
+        document.documentElement.style.setProperty('--pz', Math.min(703 / 920, 1025 / Math.max(1, Hh)).toFixed(4));
+      }
+      var box = $('sec-print');
+      if (mode === 'min') box.innerHTML = docPreview(minutesBlocks());
+      else if (mode === 'board') box.innerHTML = docPreview(boardBlocks());
+      else if (mode === 'holders') box.innerHTML = holdersPrintHtml();
+      else if (mode === 'notice' || mode === 'proxy') box.innerHTML = docPreview(DOC_DEF[mode].blocks());
+      else box.innerHTML = '';
+      var body = document.body, old = document.title, done = false;
+      ['pm-report', 'pm-annual', 'pm-min', 'pm-board', 'pm-holders', 'pm-notice', 'pm-proxy'].forEach(function (c) { body.classList.remove(c); });
+      body.classList.add('pm-' + mode); document.title = title;
+      function clean() { if (done) return; done = true; body.classList.remove('pm-' + mode); document.title = old; }
+      window.addEventListener('afterprint', clean, { once: true });
+      var msg = btn && btn.parentNode && btn.parentNode.querySelector('.bz-hint, .eb-msg, .pdf-msg'); if (!msg) msg = $('kkMsg'); if (msg) msg.textContent = '인쇄 창에서 「PDF로 저장」(아이폰은 공유 → 파일에 저장)을 고르세요. 파일 이름: ' + title + '.pdf';
+      setTimeout(function () { try { window.print(); } catch (e) { clean(); } setTimeout(clean, 120000); }, 60);   // 2분 뒤에도 표시가 남아 있으면 정리
+    }
+    document.addEventListener('click', function (e) { var m = e.target.getAttribute && e.target.getAttribute('data-pdf'); if (m) printPdf(m, e.target); });
+    DOC_DEF.proxy = { title: '위임장', blocks: function () { return proxyBlocks(proxyWho()); }, name: function () { var w2 = proxyWho(); return '위임장' + (w2 === '*' ? '_주주전원' : w2 ? '_' + w2 : ''); } };
+    (function () {
+      var box = $('proxyBox'); if (!box) return;
+      box.addEventListener('change', function (e) { if (e.target.id !== 'pxWho') return; db.proxyWho = e.target.value; save(); e.target.blur(); renderProxy(); });
+    })();
 
     /* ── 정관 (2025.01.27 시행본) — 정관 변경 안건에서 조항을 적으면 현행 문구를 자동으로 보여 주고, 개정 문구를 의사록·대비표에 넣음
        (제46조의 이사 주민등록번호·주소는 옮기지 않음) */
@@ -4917,6 +5673,19 @@ body{
       r.used = r.present > 0;
       return r;
     }
+    function holdersPrintHtml() {   // 주주명부 PDF (주민번호는 앞 6자리만, 연락처 없음)
+      var H = holders(), M = minData(), att = M.att || {}, A = holdAtt(M), total = cover().shares;
+      var h = '<div class="doc-prev"><div class="cv-title">주 주 명 부</div><p style="text-align:right">염전마을주민발전주식회사 · 발행주식 총수 ' + total + '주</p>' +
+        '<table class="hp-tbl"><colgroup><col style="width:7%"><col style="width:13%"><col style="width:19%"><col><col style="width:10%"><col style="width:9%"></colgroup>' +
+        '<tr><th>번호</th><th>성 명</th><th>주민등록번호</th><th>주 소</th><th>주식 수</th><th>출석</th></tr>';
+      H.forEach(function (x, i) {
+        var a = att[String(x.n || '').replace(/\s+/g, '')] || '', at2 = a === 'S' ? '본인' : a === 'P' ? '위임' : '불참';
+        h += '<tr><td style="text-align:center">' + (i + 1) + '</td><td style="text-align:center">' + esc(x.n || '') + '</td><td style="text-align:center">' + esc(rrnMask(x.b)) + '</td><td>' + esc(x.a || '') + '</td><td style="text-align:center">' + esc(x.s || '') + '</td><td style="text-align:center;font-weight:700;color:' + (a ? '#1f3a68' : '#c62828') + '">' + at2 + '</td></tr>';
+      });
+      h += '<tr><th colspan="4">합 계 (주주 ' + A.count + '명)</th><th>' + A.total + '</th><th></th></tr></table>' +
+        '<p style="margin-top:8px">출석 ' + A.present + '명 (본인 ' + A.self + '명, 위임 ' + A.proxy + '명), 출석 의결권 ' + A.shares + '주' + (total ? ' (발행주식의 ' + Math.round(A.shares / total * 1000) / 10 + '%)' : '') + '</p></div>';
+      return h;
+    }
     function renderHolders() {
       var box = $('holdBox'); if (!box || box.contains(document.activeElement)) return;
       var H = holders(), M = minData(), att = M.att || {}, A = holdAtt(M), total = cover().shares;
@@ -4942,12 +5711,13 @@ body{
         '<br>출석 <b>' + A.present + '명</b> (본인 ' + A.self + '명, 위임 ' + A.proxy + '명), 출석 의결권 <b>' + A.shares + '주</b>' + (total ? ' (발행주식의 ' + Math.round(A.shares / total * 1000) / 10 + '%)' : '') +
         (A.present ? (A.shares * 4 >= total ? ' <span class="check ok">✔ 보통결의 가능(발행주식 4분의 1 이상)</span>' : ' <span class="check warn">⚠ 출석 의결권이 발행주식의 4분의 1(' + Math.ceil(total / 4) + '주)에 못 미쳐 보통결의를 할 수 없습니다</span>') : '') +
         (A.present ? ' <button type="button" class="cv-del" id="hdAttClear" style="width:auto;padding:0 8px">출석 모두 지우기</button>' : '') + '</div>' +
-        '<p><button type="button" class="cv-add" id="hdPng" style="display:inline-block">📷 주주명부 사진으로 저장</button> <span id="hdPngMsg" class="bz-hint"></span></p>' +
+        '<p><button type="button" class="cv-add" id="hdPng" style="display:inline-block">📷 주주명부 사진으로 저장</button> <button type="button" class="cv-add" data-pdf="holders" style="display:inline-block">📄 주주명부 PDF로 저장</button> <span id="hdPngMsg" class="bz-hint"></span></p>' +
         '<p><label class="cv-add" style="display:inline-block">📂 주주명부 한글 파일(.hwpx) 불러오기<input type="file" id="hdFile" accept=".hwpx" hidden></label> <span id="hdMsg" class="bz-hint"></span></p>' +
         '<details><summary>명단 한꺼번에 넣기 (붙여넣기)</summary><p class="bz-hint">한 줄에 한 사람씩 「이름, 주민번호 앞 6자리, 주소, 주식 수」 순서로 적거나 붙여넣으세요. 쉼표나 탭으로 나눕니다. 예) 홍길동, 600101, 백수읍 백수로 100, 12</p>' +
         '<textarea class="hd-paste" id="hdPaste" placeholder="홍길동, 600101, 백수읍 백수로 100, 12"></textarea>' +
         '<p><button type="button" class="cv-add" id="hdImport" style="display:inline-block">아래에 추가</button> <button type="button" class="cv-add" id="hdReplace" style="display:inline-block">명부를 이걸로 바꾸기</button></p></details>';
       box.innerHTML = h;
+      try { renderProxy(); renderBoard(); } catch (e) { }   // 위임장 주주 목록·이사회 주소도 새로
     }
     // 주주명부 한글 파일: 「주주명 | 주민등록번호 | 주소 | 소유주식수 | 연락처」 표를 읽음
     // (주민번호는 앞 6자리만, 연락처는 읽지 않음)
@@ -5311,7 +6081,7 @@ body{
       P.extra.forEach(function (x, i) { if (!x.ok) warn.push('제' + (i + 2) + '호'); });
       var reg = P.extra.some(function (x) { return x.reg; });
       box.innerHTML = '<div class="cv-title">' + esc(P.title) + '</div><div class="mn-body">' +
-        '<p class="no-print"><button type="button" class="cv-add" id="mnPng" style="display:inline-block">📷 의사록 사진으로 저장</button> <span id="mnPngMsg" class="bz-hint"></span></p>' +
+        '<p class="no-print"><button type="button" class="cv-add" id="mnPng" style="display:inline-block">📷 의사록 사진으로 저장</button> <button type="button" class="cv-add" data-pdf="min" style="display:inline-block">📄 의사록 PDF로 저장</button> <span id="mnPngMsg" class="bz-hint"></span></p>' +
         '<p class="no-print bz-hint">상법 제373조(의사록)와 공증 때 확인하는 사항(정족수·의결권 수·결의 요건·의장과 출석 이사 날인)을 갖춘 양식입니다. 주주 33명이 12주씩, 대표이사가 4주를 더 가져 <b>출석 의결권 = 출석 주주 수 × 12주 + 4주</b>로 자동 계산합니다(실제와 다르면 「출석 의결권」 칸에 직접 적으세요). 안건 이름을 적으면 결과 문장과 의결권 수가 자동으로 들어갑니다.</p>' +
         '<p>' + esc(P.lead) + '</p>' +
         '<p>1. 회 사 명 : 염전마을주민발전주식회사 &nbsp; 본점 ' + inp('addr', 'w', '등기부상 본점 주소') + '</p>' +
@@ -5421,7 +6191,7 @@ body{
         var d = e.target.getAttribute('data-xdel');
         if (d != null && window.confirm('제' + (+d + 2) + '호 의안을 지울까요?')) { M.extra.splice(+d, 1); M.extra.forEach(function (x, i) { if (x.bodyAuto !== false && x.q) x.body = fillAll(agendaText(x.q, i), x); });   /* 번호가 당겨지면 자동 문장의 번호도 맞춤 */ save(); document.activeElement.blur(); renderMinutes(); }
       });
-      box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) renderMinutes(); }, 0); });
+      box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) { renderMinutes(); try { renderNotice(); renderProxy(); } catch (e) { } } }, 0); });
     })();
     // 의사록 한 장 맞추기: 안건이 늘면 글씨·간격을 단계별로 줄임 (A4 글자 영역 약 270mm 안)
     var MIN_LEVELS = [
