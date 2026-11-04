@@ -747,6 +747,14 @@ body{
   #ledger .cv-tbl td{ height:32px; }
   #ledger .cv-line{ font-size:17px; margin:4px 0 4px 10px; }
   #ledger .cv-del{ width:26px; height:24px; padding:0; border:1px solid #e4a3a0; background:#fff5f4; color:#b42318; border-radius:4px; cursor:pointer; }
+  #ledger .hd-tbl{ width:100%; border-collapse:collapse; font-size:15px; }
+  #ledger .hd-tbl th, #ledger .hd-tbl td{ border:1px solid #9aa7c2; padding:3px 4px; text-align:center; }
+  #ledger .hd-tbl th{ background:#e8eef9; color:#1d2b5c; }
+  #ledger .hd-tbl input, #ledger .hd-tbl select{ font:inherit; width:100%; box-sizing:border-box; border:1px solid #ccd; border-radius:3px; padding:2px 4px; background:#fffef2; text-align:center; }
+  #ledger .hd-tbl input.ad{ text-align:left; } #ledger .hd-tbl .no{ width:2.4em; color:#667; }
+  #ledger .hd-tbl tr.att td{ background:#eef8ee; }
+  #ledger .hd-sum{ margin:8px 0; font-size:15px; line-height:1.7; }
+  #ledger .hd-paste{ width:100%; box-sizing:border-box; font:inherit; font-size:14px; min-height:90px; }
   #ledger .cv-add{ display:block; margin:8px auto 0; font:inherit; font-size:15px; padding:6px 14px; border:1px solid #1d2b5c; background:#fff; color:#1d2b5c; border-radius:6px; cursor:pointer; }
 
   /* 공식 양식 재무제표 */
@@ -1237,6 +1245,7 @@ body{
         <a href="#sec-chart">그래프</a>
         <a href="#sec-accounts">통장잔액</a>
         <a href="#sec-receipt">영수증</a>
+        <a href="#sec-holders">주주명부</a>
       </nav>
       <span class="spacer"></span>
       <button type="button" id="btnPrint">인쇄 / PDF</button>
@@ -1349,6 +1358,10 @@ body{
 
       <section id="sec-resol" class="lsheet">
         <div id="resolBox"></div>
+      </section>
+
+      <section id="sec-holders" class="lsheet no-print">
+        <div id="holdBox"></div>
       </section>
 
       <section id="sec-min" class="lsheet last">
@@ -2604,6 +2617,7 @@ body{
       renderShare();
       renderTitle();
       renderMinutes();
+      renderHolders();
       renderBiz();
       renderCmp();
       renderAudit();
@@ -4702,6 +4716,170 @@ body{
       return out;
     }
 
+    /* ── 주주명부 (화면에서만 보임 — 한글 파일·사진에는 넣지 않음) ──
+       주민등록번호는 앞 6자리(생년월일)만 보관하고 뒤 7자리는 받지도 저장하지도 않음 → 화면에는 600101-******* */
+    function holders() { if (!db.holders) db.holders = []; return db.holders; }
+    function rrnFront(v) { return String(v || '').replace(/\D/g, '').slice(0, 6); }   // 뒷자리를 적어도 앞 6자리만 남김
+    function rrnMask(b) { b = rrnFront(b); return b ? b + '-*******' : ''; }
+    function birthOf(b) {   // 600101 → 1960.01.01 (올해 두 자리보다 크면 1900년대)
+      var m = rrnFront(b).match(/^(\d{2})(\d{2})(\d{2})$/); if (!m) return '';
+      var yy = +m[1], Y = (yy > new Date().getFullYear() % 100 ? 1900 : 2000) + yy;
+      return Y + '.' + m[2] + '.' + m[3];
+    }
+    function holderByName(n) { n = String(n || '').replace(/\s+/g, ''); return holders().filter(function (h) { return String(h.n || '').replace(/\s+/g, '') === n; })[0] || null; }
+    // 출석 표시(올해 의사록 기준): M.att[이름] = 'S'(본인) | 'P'(위임)
+    function holdAtt(M) {
+      var H = holders(), att = (M && M.att) || {}, r = { count: 0, total: 0, present: 0, self: 0, proxy: 0, shares: 0, used: false };
+      H.forEach(function (h) {
+        if (!String(h.n || '').trim()) return;
+        var s = parseInt(String(h.s || '').replace(/\D/g, ''), 10) || 0, a = att[String(h.n).replace(/\s+/g, '')];
+        r.count++; r.total += s;
+        if (a === 'S' || a === 'P') { r.present++; r.shares += s; if (a === 'S') r.self++; else r.proxy++; }
+      });
+      r.used = r.present > 0;
+      return r;
+    }
+    function renderHolders() {
+      var box = $('holdBox'); if (!box || box.contains(document.activeElement)) return;
+      var H = holders(), M = minData(), att = M.att || {}, A = holdAtt(M), total = cover().shares;
+      var h = '<div class="cv-title">주 주 명 부</div>' +
+        '<p class="bz-hint">이 명부는 <b>화면에서만</b> 보이고 결산서 한글 파일·카톡 사진에는 들어가지 않습니다. 주민등록번호는 <b>앞 6자리만</b> 보관합니다(뒤 7자리는 별표). ' +
+        '「출석」을 고르면 아래 정기주주총회 의사록의 출석 주주 수·의결권 수가 자동으로 계산되고, 이사·감사 선임 안건에서 이름을 고르면 생년월일·주소가 의사록에 들어갑니다.</p>' +
+        '<table class="hd-tbl"><colgroup><col style="width:5%"><col style="width:14%"><col style="width:20%"><col><col style="width:10%"><col style="width:12%"><col style="width:6%"></colgroup>' +
+        '<tr><th>번호</th><th>성명</th><th>주민등록번호</th><th>주소</th><th>주식 수</th><th>출석</th><th></th></tr>';
+      H.forEach(function (x, i) {
+        var a = att[String(x.n || '').replace(/\s+/g, '')] || '';
+        h += '<tr class="' + (a ? 'att' : '') + '"><td class="no">' + (i + 1) + '</td>' +
+          '<td><input data-h="' + i + '" data-f="n" value="' + esc(x.n || '') + '"></td>' +
+          '<td><input data-h="' + i + '" data-f="b" inputmode="numeric" placeholder="앞 6자리" value="' + esc(rrnMask(x.b)) + '"></td>' +
+          '<td><input class="ad" data-h="' + i + '" data-f="a" value="' + esc(x.a || '') + '"></td>' +
+          '<td><input data-h="' + i + '" data-f="s" inputmode="numeric" value="' + esc(x.s || '') + '"></td>' +
+          '<td><select data-hatt="' + i + '"><option value="">불참</option><option value="S"' + (a === 'S' ? ' selected' : '') + '>본인</option><option value="P"' + (a === 'P' ? ' selected' : '') + '>위임</option></select></td>' +
+          '<td><button type="button" class="cv-del" data-hdel="' + i + '" title="이 주주 지우기">－</button></td></tr>';
+      });
+      h += '</table><p><button type="button" class="cv-add" id="hdAdd">＋ 주주 추가</button></p>';
+      var okSum = A.total === total;
+      h += '<div class="hd-sum">주주 <b>' + A.count + '명</b>, 주식 합계 <b>' + A.total + '주</b> ' +
+        (A.count ? (okSum ? '<span class="check ok">✔ 발행주식 총수 ' + total + '주와 같습니다</span>' : '<span class="check warn">⚠ 발행주식 총수 ' + total + '주와 ' + (A.total - total) + '주 차이</span>') : '') +
+        '<br>출석 <b>' + A.present + '명</b> (본인 ' + A.self + '명, 위임 ' + A.proxy + '명), 출석 의결권 <b>' + A.shares + '주</b>' + (total ? ' (발행주식의 ' + Math.round(A.shares / total * 1000) / 10 + '%)' : '') +
+        (A.present ? (A.shares * 4 >= total ? ' <span class="check ok">✔ 보통결의 가능(발행주식 4분의 1 이상)</span>' : ' <span class="check warn">⚠ 출석 의결권이 발행주식의 4분의 1(' + Math.ceil(total / 4) + '주)에 못 미쳐 보통결의를 할 수 없습니다</span>') : '') +
+        (A.present ? ' <button type="button" class="cv-del" id="hdAttClear" style="width:auto;padding:0 8px">출석 모두 지우기</button>' : '') + '</div>' +
+        '<p><label class="cv-add" style="display:inline-block">📂 주주명부 한글 파일(.hwpx) 불러오기<input type="file" id="hdFile" accept=".hwpx" hidden></label> <span id="hdMsg" class="bz-hint"></span></p>' +
+        '<details><summary>명단 한꺼번에 넣기 (붙여넣기)</summary><p class="bz-hint">한 줄에 한 사람씩 「이름, 주민번호 앞 6자리, 주소, 주식 수」 순서로 적거나 붙여넣으세요. 쉼표나 탭으로 나눕니다. 예) 홍길동, 600101, 백수읍 백수로 100, 12</p>' +
+        '<textarea class="hd-paste" id="hdPaste" placeholder="홍길동, 600101, 백수읍 백수로 100, 12"></textarea>' +
+        '<p><button type="button" class="cv-add" id="hdImport" style="display:inline-block">아래에 추가</button> <button type="button" class="cv-add" id="hdReplace" style="display:inline-block">명부를 이걸로 바꾸기</button></p></details>';
+      box.innerHTML = h;
+    }
+    // 주주명부 한글 파일: 「주주명 | 주민등록번호 | 주소 | 소유주식수 | 연락처」 표를 읽음
+    // (주민번호는 앞 6자리만, 연락처는 읽지 않음)
+    function holdersFromHwpx(buf) {
+      return unzip(buf).then(function (files) {
+        var out = [];
+        files.filter(function (f) { return /^Contents\/section\d+\.xml$/.test(f.name); }).forEach(function (f) {
+          var doc = new DOMParser().parseFromString(new TextDecoder().decode(f.data), 'application/xml');
+          Array.prototype.forEach.call(doc.getElementsByTagNameNS(HP, 'tbl'), function (tb) {
+            var rows = Array.prototype.map.call(tb.getElementsByTagNameNS(HP, 'tr'), function (tr) {
+              return Array.prototype.map.call(tr.getElementsByTagNameNS(HP, 'tc'), function (tc) {
+                return Array.prototype.map.call(tc.getElementsByTagNameNS(HP, 't'), function (t) { return t.textContent; }).join('').trim();
+              });
+            });
+            var hi = -1, col = {};
+            rows.some(function (r, i) {
+              var k = r.map(function (x) { return x.replace(/\s+/g, ''); });
+              var n = k.findIndex(function (x) { return /^(주주명|성명|이름|주주)$/.test(x); }), b = k.findIndex(function (x) { return /주민/.test(x); });
+              var a = k.findIndex(function (x) { return /^주소$/.test(x); }), sh = k.findIndex(function (x) { return /주식/.test(x); });
+              if (n >= 0 && a >= 0 && sh >= 0) { hi = i; col = { n: n, b: b, a: a, s: sh }; return true; }
+              return false;
+            });
+            if (hi < 0) return;
+            rows.slice(hi + 1).forEach(function (r) {
+              var n = String(r[col.n] || '').replace(/\s+/g, ''), sh = String(r[col.s] || '').replace(/\D/g, '');
+              if (!n || !sh || /합계|총|계$/.test(n)) return;
+              out.push({ n: n, b: col.b >= 0 ? rrnFront(r[col.b]) : '', a: String(r[col.a] || '').trim(), s: sh });
+            });
+          });
+        });
+        return out;
+      });
+    }
+    function parseHolders(text) {
+      var out = [];
+      String(text || '').split(/\r?\n/).forEach(function (line) {
+        var parts = line.split(/\t|,|，/).map(function (x) { return x.trim(); }).filter(Boolean);
+        if (!parts.length) return;
+        var b = '', sh = '', rest = [];
+        parts.forEach(function (x) {
+          if (!b && /^\d{6}(\s*-\s*[\d*]{0,7})?$/.test(x)) b = rrnFront(x);
+          else if (/^\d{1,5}\s*주?$/.test(x)) sh = x.replace(/\D/g, '');
+          else rest.push(x);
+        });
+        if (!rest.length) return;
+        out.push({ n: rest[0].replace(/\s+/g, ''), b: b, a: rest.slice(1).join(' '), s: sh });
+      });
+      return out;
+    }
+    (function () {
+      var box = $('holdBox'); if (!box) return;
+      box.addEventListener('focusin', function (e) {   // 주민번호 칸: 고칠 때는 앞 6자리만 보이게
+        var el = e.target; if (el.getAttribute('data-f') !== 'b') return;
+        el.value = rrnFront(el.value);
+      });
+      box.addEventListener('input', function (e) {
+        var el = e.target, i = el.getAttribute('data-h'), f = el.getAttribute('data-f');
+        if (i == null || !f) return;
+        var x = holders()[+i]; if (!x) return;
+        if (f === 'b') { var v = rrnFront(el.value); if (el.value !== v) el.value = v; x.b = v; }   // 뒤 7자리는 적어도 바로 지움
+        else if (f === 'n') {   // 이름을 바꾸면 출석 표시도 새 이름으로 옮김
+          var M = minData(), old = String(x.n || '').replace(/\s+/g, ''), nw = el.value.replace(/\s+/g, '');
+          if (M.att && M.att[old] && old !== nw) { M.att[nw] = M.att[old]; delete M.att[old]; }
+          x.n = el.value;
+        }
+        else x[f] = el.value;
+        saveSoon();
+      });
+      box.addEventListener('change', function (e) {
+        if (e.target.id === 'hdFile') {
+          var f = e.target.files && e.target.files[0], msg = $('hdMsg'); if (!f) return;
+          if (typeof DecompressionStream === 'undefined') { msg.textContent = '⚠ 이 브라우저에서는 한글 파일을 읽을 수 없습니다.'; return; }
+          msg.textContent = '읽는 중…';
+          f.arrayBuffer().then(holdersFromHwpx).then(function (list) {
+            if (!list.length) { msg.textContent = '⚠ 파일에서 주주명부 표(주주명·주소·주식수)를 찾지 못했습니다.'; return; }
+            var H = holders();
+            if (H.length && !window.confirm('지금 명부 ' + H.length + '명을 지우고 파일의 ' + list.length + '명으로 바꿀까요?')) { msg.textContent = '취소했습니다.'; return; }
+            H.length = 0; list.forEach(function (x) { H.push(x); });
+            save(); renderHolders(); renderMinutes();
+            var m2 = $('hdMsg'); if (m2) m2.textContent = '✔ ' + list.length + '명을 불러왔습니다 (주민번호는 앞 6자리만, 연락처는 넣지 않음).';
+          }).catch(function (err) { msg.textContent = '⚠ 파일을 읽지 못했습니다: ' + err.message; });
+          e.target.value = '';
+          return;
+        }
+        var i = e.target.getAttribute('data-hatt'); if (i == null) return;
+        var x = holders()[+i], M = minData(); if (!x) return;
+        M.att = M.att || {}; var k = String(x.n || '').replace(/\s+/g, '');
+        if (e.target.value) M.att[k] = e.target.value; else delete M.att[k];
+        save(); e.target.blur(); renderHolders(); renderMinutes();
+      });
+      box.addEventListener('click', function (e) {
+        var id = e.target.id, H = holders();
+        if (id === 'hdAdd') { H.push({ n: '', b: '', a: '', s: '' }); save(); e.target.blur(); renderHolders(); var ns = box.querySelectorAll('input[data-f="n"]'); if (ns.length) ns[ns.length - 1].focus(); return; }
+        if (id === 'hdAttClear') { if (window.confirm('출석 표시를 모두 지울까요?')) { minData().att = {}; save(); e.target.blur(); renderHolders(); renderMinutes(); } return; }
+        if (id === 'hdImport' || id === 'hdReplace') {
+          var list = parseHolders(($('hdPaste') || {}).value);
+          if (!list.length) { window.alert('넣을 명단이 없습니다. 「이름, 주민번호 앞 6자리, 주소, 주식 수」 순서로 한 줄에 한 사람씩 적어 주세요.'); return; }
+          if (id === 'hdReplace' && H.length && !window.confirm('지금 명부 ' + H.length + '명을 지우고 붙여넣은 ' + list.length + '명으로 바꿀까요?')) return;
+          if (id === 'hdReplace') H.length = 0;
+          list.forEach(function (x) { H.push(x); });
+          save(); e.target.blur(); renderHolders(); renderMinutes(); return;
+        }
+        var d = e.target.getAttribute('data-hdel');
+        if (d != null && window.confirm((H[+d].n || '이 주주') + '을(를) 명부에서 지울까요?')) {
+          var M = minData(), k = String(H[+d].n || '').replace(/\s+/g, ''); if (M.att) delete M.att[k];
+          H.splice(+d, 1); save(); document.activeElement.blur(); renderHolders(); renderMinutes();
+        }
+      });
+      box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) { renderHolders(); renderMinutes(); } }, 0); });
+    })();
+
     /* ── 정기주주총회 의사록 (한 장, 상법 제373조: 경과요령·결과 기재, 의장·출석 이사 기명날인) ── */
     /* 주주 구성: 33가구가 12주씩(396주), 남는 4주는 대표이사가 추가 보유(16주) → 출석 의결권 = 출석 주주 수 × 12 + 4 (의장 출석) */
     function minData() {
@@ -4711,8 +4889,9 @@ body{
       Object.keys(D).forEach(function (k) { if (M[k] == null) M[k] = D[k]; });
       return M;
     }
-    function minShares(M) {   // 출석 의결권 수: 직접 적은 값이 있으면 그 값, 없으면 출석 주주 수로 계산
+    function minShares(M) {   // 출석 의결권 수: 직접 적은 값 → 주주명부 출석 표시 → 출석 주주 수로 계산
       if (String(M.shares || '').trim()) return parseInt(M.shares, 10) || 0;
+      var A = holdAtt(M); if (A.used) return A.shares;
       var n = parseInt(M.present, 10); if (!n) return 0;
       return n * (parseInt(M.perShare, 10) || 0) + (parseInt(M.ceoExtra, 10) || 0);
     }
@@ -4728,16 +4907,28 @@ body{
       return { phrase: phrase, ok: ok, yes: yes, ps: ps };
     }
     function josa(n, a, b) { var ch = String(n).charCodeAt(String(n).length - 1) - 0xAC00; return ch >= 0 && ch < 11172 && ch % 28 ? a : b; }
+    // 선임 안건: 주주명부에서 고른 사람의 이름·생년월일·주소를 ○○○ 자리에 넣음 (주민번호 뒷자리는 넣지 않음)
+    var WHO_RE = /(이사|감사|대표이사|임원).*(선임|재선임|선출|개선)/;
+    function fillWho(body, h) {
+      if (!h || !String(h.n || '').trim()) return body;
+      var n = String(h.n).replace(/\s+/g, ''), bd = birthOf(h.b), ad = String(h.a || '').trim();
+      if (/^백수(로|하사리)/.test(ad)) ad = '백수읍 ' + ad.replace(/^백수(?=하사리)/, '');   // 「백수로237」 → 「백수읍 백수로237」
+      if (/^(백수읍|염산면)/.test(ad)) ad = '전라남도 영광군 ' + ad;   // 마을 주소만 앞에 시·군을 붙임 (다른 지역 주소는 적힌 그대로)
+      var info = n + '(' + ['생년월일 ' + (bd || '○○○○.○○.○○'), ad ? '주소 ' + ad : ''].filter(Boolean).join(', ') + ')';
+      return body.replace(/후보자로 ○○○을\(를\)/g, '후보자로 ' + n + josa(n, '을', '를'))
+        .replace(/○○○\(생년월일 ○○○○\.○○\.○○(, 주소 ○○○○)?\)을\(를\)/g, info + josa(n, '을', '를'));
+    }
     function minParts() {
       var M = minData(), c = cover(), O = fsOfficial(year), D = titleDate(), gi = O ? O.meta.gi : year - 2018, w = function (v) { return C.formatWon(v) + '원'; };
       var total = c.shares, ps = minShares(M), pct = ps && total ? Math.round(ps / total * 1000) / 10 + '%' : '　　%';
+      var A = holdAtt(M), hn = A.count ? A.count : M.holders, pr = A.used ? A.present : M.present, sf = A.used ? A.self : M.self, px = A.used ? A.proxy : M.proxy;   // 주주명부가 있으면 그 숫자
       function b(v, n) { return String(v || '').trim() ? String(v) : new Array((n || 4) + 1).join('　'); }
       var people = c.members.filter(function (m) { return m[0] || m[1]; }).map(function (m) { return [String(m[0] || '').replace(/\s+/g, ''), String(m[1] || '').replace(/\s+/g, '').split('').join(' '), String(m[1] || '').replace(/\s+/g, '')]; });
       var ceo = people.filter(function (p) { return /대표/.test(p[0]); })[0] || ['대표이사', '', ''];
       var v1 = voteOf(M, M.a1 || {}, '보통', total);
       var extra = (M.extra || []).filter(function (x) { return x && (x.q || x.body); }).map(function (x, i) {
         var kind = x.kind || (SPECIAL_RE.test(String(x.q || '').replace(/\s+/g, '')) ? '특별' : '보통'), v = voteOf(M, x, kind, total);
-        var body = String(x.body || '').replace(/\{결의\}/g, v.phrase).replace(/출석 주주 전원의 찬성으로/g, v.phrase);
+        var body = fillWho(String(x.body || ''), holderByName(x.who)).replace(/\{결의\}/g, v.phrase).replace(/출석 주주 전원의 찬성으로/g, v.phrase);
         return { q: '제' + (i + 2) + '호 의안 : ' + (x.q || '') + ' (' + kind + '결의)', body: body, ok: v.ok, kind: kind, reg: /선임|해임|정관|대표이사|본점|목적|사임|퇴임/.test(String(x.q || '').replace(/\s+/g, '')) };
       });
       return {
@@ -4747,8 +4938,8 @@ body{
           '2. 일    시 : ' + (D.no ? D.txt : '　　년　　월　　일') + ' ' + (M.time || ''),
           '3. 장    소 : ' + b(M.place, 8),
           '4. 의    장 : 대표이사 ' + ceo[2],
-          '5. 주주 현황 : 주주 총수 ' + b(M.holders, 2) + '명,  발행주식 총수 ' + total + '주 (의결권 있는 주식 ' + total + '주)',
-          '6. 출석 주주 : ' + b(M.present, 2) + '명 (본인 ' + b(M.self, 2) + '명, 위임 ' + b(M.proxy, 2) + '명),  출석 의결권 ' + (ps || '　　') + '주 (발행주식 총수의 ' + pct + ')'
+          '5. 주주 현황 : 주주 총수 ' + b(hn, 2) + '명,  발행주식 총수 ' + total + '주 (의결권 있는 주식 ' + total + '주)',
+          '6. 출석 주주 : ' + b(pr, 2) + '명 (본인 ' + b(sf, 2) + '명, 위임 ' + b(px, 2) + '명),  출석 의결권 ' + (ps || '　　') + '주 (발행주식 총수의 ' + pct + ')'
         ],
         open: '의장 대표이사 ' + ceo[2] + josa(ceo[2] || '가', '은', '는') + ' 정관의 규정에 따라 의장석에 등단하여, 위와 같이 발행주식 총수 ' + total + '주 중 ' + (ps || '　　') + '주(' + pct + ')의 의결권을 가진 주주가 출석하여 법령과 정관에 정한 의사정족수를 충족하였으므로 본 총회가 적법하게 성립되었음을 알리고 개회를 선언하였다. (개회 ' + b(M.open, 4) + ')',
         q: '제1호 의안 : 제' + gi + '기(' + year + '.01.01 ~ ' + year + '.12.31) 재무제표 승인의 건 (보통결의)',
@@ -4808,7 +4999,7 @@ body{
         return '<p class="no-print mn-vote">결의 ' + (kind != null ? '<select ' + attr + ' data-f="kind"><option value=""' + (!v.kind ? ' selected' : '') + '>자동(' + kind + ')</option><option value="보통"' + (v.kind === '보통' ? ' selected' : '') + '>보통결의</option><option value="특별"' + (v.kind === '특별' ? ' selected' : '') + '>특별결의</option></select>' : '보통결의') +
           ' · 찬성 <input ' + attr + ' data-f="yes" inputmode="numeric" placeholder="' + (ps || '출석') + '" value="' + esc(v.yes || '') + '">주 반대 <input ' + attr + ' data-f="no" inputmode="numeric" placeholder="0" value="' + esc(v.no || '') + '">주 기권 <input ' + attr + ' data-f="abs" inputmode="numeric" placeholder="0" value="' + esc(v.abs || '') + '">주</p>';
       }
-      var ps = minShares(M), warn = [];
+      var ps = minShares(M), warn = [], HA = holdAtt(M);
       if (!P.ok1) warn.push('제1호');
       P.extra.forEach(function (x, i) { if (!x.ok) warn.push('제' + (i + 2) + '호'); });
       var reg = P.extra.some(function (x) { return x.reg; });
@@ -4818,13 +5009,16 @@ body{
         '<p>2. 일 &nbsp;&nbsp; 시 : ' + esc(P.date) + ' ' + inp('time', '', '오전 10시') + ' <span class="bz-hint no-print">(날짜는 표지의 「총회 날짜」)</span></p>' +
         '<p>3. 장 &nbsp;&nbsp; 소 : ' + inp('place', 'w', '염전마을 회관') + '</p>' +
         '<p>4. 의 &nbsp;&nbsp; 장 : 대표이사 ' + esc(P.ceo[2]) + '</p>' +
-        '<p>5. 주주 현황 : 주주 총수 ' + inp('holders', '', '명') + '명, 발행주식 총수 ' + total + '주 <span class="no-print bz-hint">(1가구 ' + inp('perShare', '', '12') + '주, 대표이사 추가 ' + inp('ceoExtra', '', '4') + '주)</span></p>' +
-        '<p>6. 출석 주주 : ' + inp('present', '', '명') + '명 (본인 ' + inp('self', '', '명') + '명, 위임 ' + inp('proxy', '', '명') + '명), 출석 의결권 ' + inp('shares', '', ps ? String(ps) : '자동') + '주' + (ps ? ' <b>(' + ps + '주, ' + Math.round(ps / total * 1000) / 10 + '%)</b>' : '') + '</p>' +
+        '<p>5. 주주 현황 : 주주 총수 ' + (HA.count ? '<b>' + HA.count + '</b>' : inp('holders', '', '명')) + '명, 발행주식 총수 ' + total + '주 <span class="no-print bz-hint">(1가구 ' + inp('perShare', '', '12') + '주, 대표이사 추가 ' + inp('ceoExtra', '', '4') + '주)</span></p>' +
+        '<p>6. 출석 주주 : ' + (HA.used ? '<b>' + HA.present + '</b>명 (본인 <b>' + HA.self + '</b>명, 위임 <b>' + HA.proxy + '</b>명) <span class="no-print bz-hint">주주명부의 출석 표시로 자동</span>' : inp('present', '', '명') + '명 (본인 ' + inp('self', '', '명') + '명, 위임 ' + inp('proxy', '', '명') + '명)') + ', 출석 의결권 ' + inp('shares', '', ps ? String(ps) : '자동') + '주' + (ps ? ' <b>(' + ps + '주, ' + Math.round(ps / total * 1000) / 10 + '%)</b>' : '') + '</p>' +
         '<p>' + esc(P.open).replace(/\(개회 [^)]*\)/, '(개회 ' + inp('open', '', '10시 00분') + ')') + '</p>' +
         '<p class="mn-q">' + esc(P.q) + '</p><p>' + esc(P.body) + '</p>' + voteRow('data-a1="1"', M.a1 || {}, null, ps) +
         (M.extra || []).map(function (x, i) {
           var auto = SPECIAL_RE.test(String(x.q || '').replace(/\s+/g, '')) ? '특별' : '보통', px = P.extra[i];
           return '<div class="mn-ex"><p class="mn-q">제' + (i + 2) + '호 의안 : <input class="w mn-xq" data-x="' + i + '" data-f="q" placeholder="예: 이사 선임의 건" value="' + esc(x.q || '') + '"> <button type="button" class="cv-del no-print" data-xdel="' + i + '" title="이 안건 지우기">－</button></p>' +
+            (WHO_RE.test(String(x.q || '').replace(/\s+/g, '')) ? '<p class="no-print mn-vote">선임할 사람 <select data-x="' + i + '" data-f="who"><option value="">주주명부에서 고르기</option>' +
+              holders().filter(function (h) { return String(h.n || '').trim(); }).map(function (h) { var n = String(h.n).replace(/\s+/g, ''); return '<option value="' + esc(n) + '"' + (String(x.who || '') === n ? ' selected' : '') + '>' + esc(n) + (h.b ? ' (' + esc(birthOf(h.b)) + ')' : '') + '</option>'; }).join('') +
+              '</select>' + (holders().length ? '' : ' <span class="bz-hint">주주명부를 먼저 채우세요</span>') + '</p>' : '') +
             '<textarea class="cv-purpose mn-xb" data-x="' + i + '" data-f="body" rows="3" placeholder="안건 이름을 적으면 회의 내용이 자동으로 채워집니다. {결의} 자리는 한글 파일에서 의결권 수와 결의 요건으로 바뀝니다.">' + esc(x.body || '') + '</textarea>' +
             voteRow('data-x="' + i + '"', x, auto, ps) + (px && px.reg ? '<p class="no-print check warn">⚠ 등기가 필요한 안건입니다. 등기소에 낼 의사록은 공증인 인증이 필요하고(공증인법 제66조의2), 날인은 인감도장으로 하세요. 법무사님께 확인하세요.</p>' : '') + '</div>';
         }).join('') +
@@ -4848,10 +5042,14 @@ body{
           M.extra = M.extra || []; var X = M.extra[+xi];
           X[f] = el.value;
           if (f === 'body') X.bodyAuto = !el.value.trim();   // 직접 고치면 자동 문장 멈춤 (다 지우면 다시 자동)
-          if (f === 'q' && X.bodyAuto !== false) {
-            X.body = agendaText(X.q, +xi); X.bodyAuto = true;
+          if ((f === 'q' || f === 'who') && X.bodyAuto !== false) {
+            X.body = fillWho(agendaText(X.q, +xi), holderByName(X.who)); X.bodyAuto = true;
             var ta = box.querySelector('.mn-xb[data-x="' + xi + '"]'); if (ta) ta.value = X.body;
+          } else if (f === 'who') {   // 직접 고친 문장: ○○○ 자리만 채움
+            X.body = fillWho(X.body || '', holderByName(X.who));
+            var tb = box.querySelector('.mn-xb[data-x="' + xi + '"]'); if (tb) tb.value = X.body;
           }
+          if (f === 'who') { saveSoon(); el.blur(); return; }
         }
         else return;
         saveSoon();
@@ -4865,7 +5063,7 @@ body{
         var M = minData();
         if (e.target.id === 'mnAdd') { M.extra = M.extra || []; M.extra.push({ q: '', body: '' }); save(); e.target.blur(); renderMinutes(); var q = box.querySelectorAll('.mn-xq'); if (q.length) q[q.length - 1].focus(); return; }
         var d = e.target.getAttribute('data-xdel');
-        if (d != null && window.confirm('제' + (+d + 2) + '호 의안을 지울까요?')) { M.extra.splice(+d, 1); M.extra.forEach(function (x, i) { if (x.bodyAuto !== false && x.q) x.body = agendaText(x.q, i); });   /* 번호가 당겨지면 자동 문장의 번호도 맞춤 */ save(); document.activeElement.blur(); renderMinutes(); }
+        if (d != null && window.confirm('제' + (+d + 2) + '호 의안을 지울까요?')) { M.extra.splice(+d, 1); M.extra.forEach(function (x, i) { if (x.bodyAuto !== false && x.q) x.body = fillWho(agendaText(x.q, i), holderByName(x.who)); });   /* 번호가 당겨지면 자동 문장의 번호도 맞춤 */ save(); document.activeElement.blur(); renderMinutes(); }
       });
       box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) renderMinutes(); }, 0); });
     })();
