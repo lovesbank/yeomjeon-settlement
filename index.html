@@ -142,6 +142,24 @@ body{
     white-space:nowrap;
   }
 
+  /* 제목: 남색 띠 + 금색 밑줄 */
+  #report .titleLineTop, #report .titleLineBot{ display:none; }
+  #report .titleBox{ background:linear-gradient(135deg,#1f3a68,#2f5d9a) !important; border-radius:12px; padding:20px 14px !important; box-shadow:0 6px 0 #c9a227; margin-bottom:8px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  #report .titleText{ color:#fff !important; -webkit-text-stroke:0 !important; text-shadow:0 3px 0 rgba(0,0,0,.28) !important; letter-spacing:2px !important; }
+
+  /* 표 색 (남색 머리줄 · 줄무늬 · 금색 합계) */
+  #report #incomeExpenseTable thead tr:first-child th{ background:#1f3a68 !important; color:#fff !important; letter-spacing:4px; }
+  #report #incomeExpenseTable tbody tr:nth-child(even) td{ background:#f5f8fd !important; }
+  #report #incomeExpenseTable tfoot th, #report #incomeExpenseTable tfoot td, #report #incomeExpenseTable tfoot input{ background:#fff3cf !important; color:#1f3a68 !important; font-weight:900; }
+  #report .bankTopTitle{ background:linear-gradient(135deg,#1f3a68,#2f5d9a) !important; color:#fff !important; border-radius:8px; }
+  #report .bankTopTitle .editText{ color:#fff !important; }
+  #report .bankTbl tbody tr:nth-child(even) td{ background:#f5f8fd !important; }
+  #report .bankTbl tfoot th, #report .bankTbl tfoot input{ background:#fff3cf !important; font-weight:900; }
+  #report .prevRow .label{ background:#e8eef9 !important; }
+  #report .noteLine{ background:#fffaf0 !important; }
+  #report .summary{ box-shadow:0 4px 0 #c9a227; }
+  #report table, #report .summary, #report .bankTopTitle{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
   #report .summary{
     border:var(--b) solid var(--ink);
     margin:6px 0 12px;
@@ -3022,9 +3040,22 @@ body{
     })();
 
     /* ── 카톡 공지용 사진: 결산 보고서 내용을 캔버스에 직접 그려 PNG로 (외부 도구 없이, 아이폰에서도 동작) ── */
+    // 제목 띠 그리기 (남색 그라데이션 + 둥근 모서리 + 금색 밑줄 + 흰 글씨)
+    function drawTitleBand(g, ops, x, y, w, h, text, FONT) {
+      function rr(yy, hh, r) { g.beginPath(); g.moveTo(x + r, yy); g.lineTo(x + w - r, yy); g.quadraticCurveTo(x + w, yy, x + w, yy + r); g.lineTo(x + w, yy + hh - r); g.quadraticCurveTo(x + w, yy + hh, x + w - r, yy + hh); g.lineTo(x + r, yy + hh); g.quadraticCurveTo(x, yy + hh, x, yy + hh - r); g.lineTo(x, yy + r); g.quadraticCurveTo(x, yy, x + r, yy); g.closePath(); }
+      var run = function () {
+        g.fillStyle = '#c9a227'; rr(y + 8, h, 14); g.fill();
+        var gr = g.createLinearGradient(x, y, x + w, y + h); gr.addColorStop(0, '#1f3a68'); gr.addColorStop(1, '#2f5d9a'); g.fillStyle = gr; rr(y, h, 14); g.fill();
+        var px = 48; g.font = '900 ' + px + 'px ' + FONT; while (px > 20 && g.measureText(text).width > w - 60) { px--; g.font = '900 ' + px + 'px ' + FONT; }
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillStyle = 'rgba(0,0,0,.28)'; g.fillText(text, x + w / 2, y + h / 2 + 4);
+        g.fillStyle = '#fff'; g.fillText(text, x + w / 2, y + h / 2 + 1); g.textAlign = 'left';
+      };
+      if (ops) ops.push(run); else run();
+    }
     function drawReportImage() {   // 원래 결산 보고서 화면 모양 그대로 (요약 3칸·수입/지출 표·은행 두 표 나란히·날짜/서명 상자)
       var W = 1080, P = 28, TW = W - 2 * P, FONT = '"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
-      var NAVY = '#1f3a68', INK = '#111', LINE = '#222', BLUE = '#e8f0fb', PEACH = '#fde9d9', MINT = '#e6f6f2', GRAY = '#efefef', RED = '#c62828';
+      var NAVY = '#1f3a68', INK = '#111', LINE = '#2b3a55', BLUE = '#e8f0fb', PEACH = '#fde9d9', MINT = '#e6f6f2', GRAY = '#efefef', RED = '#c62828', GOLD = '#fff3cf', ZEBRA = '#f5f8fd';
       var c = document.createElement('canvas'), g = c.getContext('2d'), ops = [], y = 0;
       function font(px, wt) { return (wt || 400) + ' ' + px + 'px ' + FONT; }
       function T(t, x, yy, px, wt, color, al) { ops.push(function () { g.font = font(px, wt); g.fillStyle = color || INK; g.textAlign = al || 'left'; g.textBaseline = 'middle'; g.fillText(t, x, yy); g.textAlign = 'left'; }); }
@@ -3048,9 +3079,7 @@ body{
       }
       function v(el) { return el ? (el.value != null ? el.value : (el.innerText || el.textContent || '')).replace(/\s+/g, ' ').trim() : ''; }
       // 제목 + 초록 줄
-      R(P, 14, TW, 6, '#9af55a'); y = 20;
-      T(txt(RPT.querySelector('.titleText')), W / 2, y + 44, 46, 900, NAVY, 'center'); y += 88;
-      R(P, y, TW, 6, '#43963f'); y += 22;
+      drawTitleBand(g, ops, P, 14, TW, 100, txt(RPT.querySelector('.titleText')), FONT); y = 14 + 100 + 8 + 22;
       // 요약 3칸
       var heads = Array.prototype.map.call(RPT.querySelectorAll('.summary .sumHead'), txt), cw = TW / 3;
       R(P - 1, y - 1, TW + 2, 122, null, 3);
@@ -3065,14 +3094,14 @@ body{
       var nl = txt(RPT.querySelector('.noteLine')); R(P, y, TW, 40, '#fff', 2.5); T(nl, W / 2, y + 21, fit(nl, 17, 400, TW - 20), 400, INK, 'center'); y += 52;
       var ieCols = [TW * 0.27, TW * 0.16, TW * 0.27, TW * 0.16, TW * 0.14];
       var ieRows = [
-        [{ t: '수    입', cs: 2, bg: GRAY, wt: 700 }, { t: '지    출', cs: 2, bg: GRAY, wt: 700 }, { t: '비    고', bg: GRAY, wt: 700 }],
+        [{ t: '수    입', cs: 2, bg: NAVY, color: '#fff', wt: 800 }, { t: '지    출', cs: 2, bg: NAVY, color: '#fff', wt: 800 }, { t: '비    고', bg: NAVY, color: '#fff', wt: 800 }],
         [{ t: '적  요', bg: BLUE, wt: 700 }, { t: '금  액', bg: BLUE, wt: 700 }, { t: '적  요', bg: PEACH, wt: 700 }, { t: '금  액', bg: PEACH, wt: 700 }, { t: '', bg: GRAY }]
       ];
-      RPT.querySelectorAll('#incomeExpenseTable tbody tr').forEach(function (tr) {
-        var f = tr.querySelectorAll('input');
-        ieRows.push([{ t: v(f[0]) }, { t: v(f[1]), al: 'right' }, { t: v(f[2]) }, { t: v(f[3]), al: 'right' }, { t: f[4] ? v(f[4]) : '', al: 'right' }]);
+      RPT.querySelectorAll('#incomeExpenseTable tbody tr').forEach(function (tr, i) {
+        var f = tr.querySelectorAll('input'), z = i % 2 ? ZEBRA : '#fff';
+        ieRows.push([{ t: v(f[0]), bg: z }, { t: v(f[1]), al: 'right', bg: z }, { t: v(f[2]), bg: z }, { t: v(f[3]), al: 'right', bg: z }, { t: f[4] ? v(f[4]) : '', al: 'right', bg: z }]);
       });
-      ieRows.push([{ t: '합    계', bg: GRAY, wt: 700 }, { t: val('incSum'), al: 'right', bg: GRAY, wt: 700 }, { t: '합    계', bg: GRAY, wt: 700 }, { t: val('expSum'), al: 'right', bg: GRAY, wt: 700 }, { t: val('netFoot'), al: 'right', bg: GRAY, wt: 700 }]);
+      ieRows.push([{ t: '합    계', bg: GOLD, wt: 800, color: NAVY }, { t: val('incSum'), al: 'right', bg: GOLD, wt: 800, color: NAVY }, { t: '합    계', bg: GOLD, wt: 800, color: NAVY }, { t: val('expSum'), al: 'right', bg: GOLD, wt: 800, color: NAVY }, { t: val('netFoot'), al: 'right', bg: GOLD, wt: 800, color: RED }]);
       var ieTop = y; y = table(P, y, ieCols, ieRows, 34, 18); R(P - 1, ieTop - 1, TW + 2, y - ieTop + 2, null, 3); y += 22;
       // 은행 입출금 내역 (기업은행 · 농협 나란히)
       T('○ ' + txt($('titleBank')), P, y + 16, 24, 800, INK); y += 40;
@@ -3080,16 +3109,16 @@ body{
       var gap = 14, bw = (TW - 24 - gap) / 2, bx0 = P + 12, bankTop = y, bottoms = [];
       [['#ibTable', 'ibPrev', 'ibInSum', 'ibOutSum', 'ibEnd'], ['#nhTable', 'nhPrev', 'nhInSum', 'nhOutSum', 'nhEnd']].forEach(function (bk, k) {
         var bx = bx0 + k * (bw + gap), yy = bankTop + 10;
-        T(titles[k] || '', bx + bw / 2, yy + 16, 20, 700, INK, 'center'); yy += 32;
-        R(bx, yy, bw, 3, LINE); yy += 6;
-        yy = table(bx, yy, [bw * 0.3, bw * 0.7], [[{ t: prevL[k] || '전월이월액', bg: '#fafafa', wt: 700 }, { t: val(bk[1]), al: 'right', color: RED }]], 36, 17) + 8;
+        (function (by) { ops.push(function () { var gr = g.createLinearGradient(bx, 0, bx + bw, 0); gr.addColorStop(0, '#1f3a68'); gr.addColorStop(1, '#2f5d9a'); g.fillStyle = gr; g.fillRect(bx, by + 2, bw, 34); }); })(yy);
+        T(titles[k] || '', bx + bw / 2, yy + 20, 20, 800, '#fff', 'center'); yy += 44;
+        yy = table(bx, yy, [bw * 0.3, bw * 0.7], [[{ t: prevL[k] || '전월이월액', bg: '#e8eef9', wt: 700, color: NAVY }, { t: val(bk[1]), al: 'right', color: RED, wt: 700 }]], 36, 17) + 8;
         var cols = [bw * 0.14, bw * 0.2, bw * 0.22, bw * 0.22, bw * 0.22];
         var rows = [[{ t: '날 짜', wt: 700 }, { t: '적 요', wt: 700 }, { t: '입 금', bg: BLUE, wt: 700 }, { t: '출 금', bg: PEACH, wt: 700 }, { t: '잔 액', bg: MINT, wt: 700 }]];
-        RPT.querySelectorAll(bk[0] + ' tbody tr').forEach(function (tr) {
-          var f = tr.querySelectorAll('input');
-          rows.push([{ t: v(f[0]) }, { t: v(f[1]) }, { t: v(f[2]), al: 'right' }, { t: v(f[3]), al: 'right' }, { t: v(f[4]), al: 'right' }]);
+        RPT.querySelectorAll(bk[0] + ' tbody tr').forEach(function (tr, i) {
+          var f = tr.querySelectorAll('input'), z = i % 2 ? ZEBRA : '#fff';
+          rows.push([{ t: v(f[0]), bg: z }, { t: v(f[1]), bg: z }, { t: v(f[2]), al: 'right', bg: z }, { t: v(f[3]), al: 'right', bg: z }, { t: v(f[4]), al: 'right', bg: z }]);
         });
-        rows.push([{ t: '합 계', wt: 700 }, { t: '' }, { t: val(bk[2]), al: 'right', wt: 700 }, { t: val(bk[3]), al: 'right', wt: 700 }, { t: val(bk[4]), al: 'right', wt: 700, color: RED }]);
+        rows.push([{ t: '합 계', wt: 800, bg: GOLD, color: NAVY }, { t: '', bg: GOLD }, { t: val(bk[2]), al: 'right', wt: 800, bg: GOLD, color: NAVY }, { t: val(bk[3]), al: 'right', wt: 800, bg: GOLD, color: NAVY }, { t: val(bk[4]), al: 'right', wt: 800, color: RED, bg: GOLD }]);
         var tt = yy; yy = table(bx, yy, cols, rows, 30, 15); R(bx - 1, tt - 1, bw + 2, yy - tt + 2, null, 2.5);
         bottoms.push(yy);
       });
@@ -3133,26 +3162,36 @@ body{
         } catch (e) { msg.textContent = '⚠ 사진을 만들지 못했습니다: ' + e.message; }
       });
     })();
+    var RPT_FILES = null;   // 한글 저장 중인 파일 목록 (제목 띠 그림 넣을 때 씀)
+    function reportTitleXml(text) {
+      if (!RPT_FILES) return paraXml(text, 29, 'C');
+      var c = document.createElement('canvas'), W = 1870, H = 190; c.width = W; c.height = H;
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+      drawTitleBand(g, null, 6, 6, W - 12, H - 30, text, '"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif');
+      RPT_FILES.filter(function (f) { return f.name === 'BinData/rpttitle.png'; }).forEach(function (f) { RPT_FILES.splice(RPT_FILES.indexOf(f), 1); });
+      addBin(RPT_FILES, 'rpttitle', canvasU8(c));
+      return '<hp:p id="2147483648" paraPrIDRef="30" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="9">' + picXml(1237872110, 'rpttitle', 50000, Math.round(50000 * H / W), W, H, INLINE, 'TOP_AND_BOTTOM', 905) + '<hp:t/></hp:run></hp:p>';
+    }
     function reportXml() {
       var out = [], BOLD = 10, RED_BIG = 24, BIG = 22;
-      out.push(paraXml(txt(RPT.querySelector('.titleText')), 29, 'C'));
+      out.push(reportTitleXml(txt(RPT.querySelector('.titleText'))));
       out.push(paraXml('', 9, 'C'));
       var heads = Array.prototype.map.call(RPT.querySelectorAll('.summary .sumHead'), txt);
       out.push(tableXml([
-        heads.map(function (x) { return { t: x, ch: BOLD }; }),
+        heads.map(function (x) { return { t: x, ch: BOLD, bf: 49 }; }),
         [{ t: val('carry'), al: 'R', ch: BIG }, { t: val('net'), al: 'R', ch: BIG }, { t: val('endBal'), al: 'R', ch: RED_BIG }]
       ], [16666, 16667, 16667], 2600));
       out.push(paraXml('● ' + txt($('titleIncomeExpense')), 11, 'L'));
       out.push(tableXml([[{ t: txt(RPT.querySelector('.noteLine')) }]], [50000], 1800));
       var rows = [
-        [{ t: '수  입', cs: 2, ch: BOLD }, { t: '지  출', cs: 2, ch: BOLD }, { t: '비  고', ch: BOLD }],
-        [{ t: '적  요', ch: BOLD }, { t: '금  액', ch: BOLD }, { t: '적  요', ch: BOLD }, { t: '금  액', ch: BOLD }, { t: '' }]
+        [{ t: '수  입', cs: 2, ch: 25, bf: 49 }, { t: '지  출', cs: 2, ch: 25, bf: 49 }, { t: '비  고', ch: 25, bf: 49 }],
+        [{ t: '적  요', ch: BOLD, bf: 49 }, { t: '금  액', ch: BOLD, bf: 49 }, { t: '적  요', ch: BOLD, bf: 49 }, { t: '금  액', ch: BOLD, bf: 49 }, { t: '', bf: 49 }]
       ];
       RPT.querySelectorAll('#incomeExpenseTable tbody tr').forEach(function (tr) {
         var f = tr.querySelectorAll('input'), blankL = !f[0].value.trim() && !C.parseWon(f[1].value), blankR = !f[2].value.trim() && !C.parseWon(f[3].value);
         rows.push([{ t: f[0].value }, { t: blankL ? '' : f[1].value, al: 'R' }, { t: f[2].value }, { t: blankR ? '' : f[3].value, al: 'R' }, { t: f[4] ? f[4].value : '' }]);
       });
-      rows.push([{ t: '합  계', ch: BOLD }, { t: val('incSum'), al: 'R', ch: BOLD }, { t: '합  계', ch: BOLD }, { t: val('expSum'), al: 'R', ch: BOLD }, { t: val('netFoot'), al: 'R', ch: BOLD }]);
+      rows.push([{ t: '합  계', ch: 25, bf: 49 }, { t: val('incSum'), al: 'R', ch: 25, bf: 49 }, { t: '합  계', ch: 25, bf: 49 }, { t: val('expSum'), al: 'R', ch: 25, bf: 49 }, { t: val('netFoot'), al: 'R', ch: 13, bf: 49 }]);
       out.push(tableXml(rows, [14000, 8000, 14000, 8000, 6000], 1700));
       out.push(paraXml('', 9, 'C'));
       out.push(paraXml('● ' + txt($('titleBank')), 11, 'L'));
@@ -3167,9 +3206,9 @@ body{
         });
       });
       var br = [
-        [{ t: titles[0] || '기업은행', cs: 5, ch: BOLD }, { t: titles[1] || '농협', cs: 5, ch: BOLD }],
+        [{ t: titles[0] || '기업은행', cs: 5, ch: 25, bf: 49 }, { t: titles[1] || '농협', cs: 5, ch: 25, bf: 49 }],
         [{ t: prevLbl[0] || '전월이월액', cs: 2, ch: BOLD }, { t: val('ibPrev'), cs: 3, al: 'R', ch: 13 }, { t: prevLbl[1] || '전월이월액', cs: 2, ch: BOLD }, { t: val('nhPrev'), cs: 3, al: 'R', ch: 13 }],
-        ['날짜', '적요', '입금', '출금', '잔액', '날짜', '적요', '입금', '출금', '잔액'].map(function (x) { return { t: x, ch: BOLD }; })
+        ['날짜', '적요', '입금', '출금', '잔액', '날짜', '적요', '입금', '출금', '잔액'].map(function (x) { return { t: x, ch: BOLD, bf: 49 }; })
       ];
       for (var i = 0; i < Math.max(data[0].length, data[1].length); i++) {
         var row = [];
@@ -3179,8 +3218,8 @@ body{
         });
         br.push(row);
       }
-      br.push([{ t: '합  계', ch: BOLD }, { t: '' }, { t: val('ibInSum'), al: 'R', ch: S }, { t: val('ibOutSum'), al: 'R', ch: S }, { t: val('ibEnd'), al: 'R', ch: 16 },
-               { t: '합  계', ch: BOLD }, { t: '' }, { t: val('nhInSum'), al: 'R', ch: S }, { t: val('nhOutSum'), al: 'R', ch: S }, { t: val('nhEnd'), al: 'R', ch: 16 }]);
+      br.push([{ t: '합  계', ch: BOLD, bf: 49 }, { t: '', bf: 49 }, { t: val('ibInSum'), al: 'R', ch: S, bf: 49 }, { t: val('ibOutSum'), al: 'R', ch: S, bf: 49 }, { t: val('ibEnd'), al: 'R', ch: 16, bf: 49 },
+               { t: '합  계', ch: BOLD, bf: 49 }, { t: '', bf: 49 }, { t: val('nhInSum'), al: 'R', ch: S, bf: 49 }, { t: val('nhOutSum'), al: 'R', ch: S, bf: 49 }, { t: val('nhEnd'), al: 'R', ch: 16, bf: 49 }]);
       out.push(tableXml(br, [3000, 5600, 5500, 5500, 5400, 3000, 5600, 5500, 5500, 5400], 1500));
       out.push(paraXml('', 9, 'C'));
       out.push(tableXml([[{ t: '■ 주민 안내', al: 'L', ch: 25, bf: 49 }]].concat(shareLines(shareCalc()).map(function (x) { return [{ t: '· ' + x, al: 'L', ch: 9 }]; })), [50000], 1300));
@@ -4419,7 +4458,8 @@ body{
         insertResolution(doc, Y, files);
         restyleTitles(doc, Y);
         if ($('hxMinutes') && $('hxMinutes').checked) appendMinutes(doc, Y);   // 선택: 정기주주총회 의사록 (결산서와 따로 쓸 때가 많아 기본은 빼고 저장)   // 원본 양식의 연두색 제목 상자 → 다른 서류와 같은 제목 상자   // 「현재통장 잔액」은 새 쪽부터 + 그 아래 이사회 결의서(회사 직인)
-        insertReport(doc, $('hxReport').checked, Y, files);   // 맨 앞: 결산 보고서 → 공식 양식 재무상태표·손익계산서·이익잉여금처분계산서
+        RPT_FILES = files;
+        try { insertReport(doc, $('hxReport').checked, Y, files); } finally { RPT_FILES = null; }   // 맨 앞: 결산 보고서 → 공식 양식 재무상태표·손익계산서·이익잉여금처분계산서
         var xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>' + new XMLSerializer().serializeToString(doc).replace(/^<\?xml[^>]*\?>\s*/, '');
         sf.data = new TextEncoder().encode(xml);
         var mt = files.filter(function (f) { return f.name === 'mimetype'; });
