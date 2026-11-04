@@ -723,6 +723,8 @@ body{
   #ledger .bz-tbl input{ width:100%; font:inherit; text-align:right; border:1px solid var(--lg-btn-line); border-radius:3px; padding:3px 6px; background:#fffef2; }
   #ledger .bz-hint{ font-size:13px; color:#777; margin:4px 0 0; }
   #ledger .bz-end{ text-align:center; font-size:17px; margin:26px 0 6px; line-height:2; }
+  #ledger .ad-seal-wrap{ position:relative; display:inline-block; }
+  #ledger .ad-seal{ position:absolute; left:50%; top:50%; width:58px; height:58px; transform:translate(-50%,-50%); mix-blend-mode:multiply; pointer-events:none; }
   #ledger .ad-body{ font-size:17px; line-height:1.9; max-width:820px; margin:0 auto; }
   #ledger .ad-body p{ margin:0 0 12px; text-indent:1em; }
   #ledger .ad-body .ad-h{ font-weight:800; color:#143a63; text-indent:0; margin-top:18px; }
@@ -4301,12 +4303,58 @@ body{
       ];
       return out;
     }
+    /* ── 감사 도장 그림: ① 앱에서 넣은 그림(이 기기에만 저장) ② 없으면 사이트에 올린 audit_stamp.png ── */
+    var auditSealRepo = null;   // 사이트(GitHub)에 audit_stamp.png가 있으면 그 그림(data URL)
+    try {
+      if (location.protocol !== 'file:') fetch('audit_stamp.png', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw 0; return r.blob(); }).then(function (b) {
+        var rd = new FileReader(); rd.onload = function () { auditSealRepo = rd.result; try { renderAudit(); } catch (e) { } }; rd.readAsDataURL(b);
+      }).catch(function () { });
+    } catch (e) { }
+    function auditSealSrc() { return (db && db.auditSeal) || auditSealRepo || ''; }
+    // 도장 사진 → 흰 바탕을 투명하게 하고 도장 둘레만 잘라 PNG로 (이미 투명 PNG면 그대로 잘라만 냄)
+    function stampImage(im) {
+      var w = im.naturalWidth, h = im.naturalHeight, c = document.createElement('canvas'); c.width = w; c.height = h;
+      var g = c.getContext('2d'); g.drawImage(im, 0, 0);
+      var d = g.getImageData(0, 0, w, h), a = d.data, x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (var i = 0; i < a.length; i += 4) {
+        var mn = Math.min(a[i], a[i + 1], a[i + 2]), al = a[i + 3] < 250 ? a[i + 3] : Math.max(0, Math.min(255, (255 - mn - 25) * 1.6));
+        a[i + 3] = al;
+        if (al > 60) { var p = i / 4, x = p % w, y = (p - x) / w; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      }
+      if (x1 < 0) throw new Error('도장이 보이지 않습니다');
+      g.putImageData(d, 0, 0);
+      var m = 3, cw = x1 - x0 + 1 + 2 * m, ch = y1 - y0 + 1 + 2 * m, k = Math.min(1, 400 / Math.max(cw, ch)), o = document.createElement('canvas');
+      o.width = Math.round(cw * k); o.height = Math.round(ch * k);
+      o.getContext('2d').drawImage(c, x0 - m, y0 - m, cw, ch, 0, 0, o.width, o.height);
+      return o.toDataURL('image/png');
+    }
+    (function () {
+      var box = $('auditBox'); if (!box) return;
+      box.addEventListener('change', function (e) {
+        if (e.target.id !== 'adSealFile') return;
+        var f = e.target.files && e.target.files[0], msg = $('adSealMsg'); if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function () {
+          var im = new Image();
+          im.onload = function () { try { db.auditSeal = stampImage(im); save(); renderAudit(); var m2 = $('adSealMsg'); if (m2) m2.textContent = '✔ 감사 도장을 넣었습니다.'; } catch (err) { if (msg) msg.textContent = '⚠ ' + err.message; } };
+          im.src = rd.result;
+        };
+        rd.readAsDataURL(f); e.target.value = '';
+      });
+      box.addEventListener('click', function (e) {
+        if (e.target.id !== 'adSealDel' || !db.auditSeal) return;
+        if (!window.confirm('앱에 넣은 감사 도장 그림을 뺄까요?')) return;
+        delete db.auditSeal; save(); renderAudit();
+      });
+    })();
     function renderAudit() {
       var box = $('auditBox'); if (!box) return;
-      var N = bizNumbers();
+      var N = bizNumbers(), seal = auditSealSrc();
       box.innerHTML = '<div class="cv-title">감 사 보 고 서</div><div class="ad-body"><p class="ad-h">염전마을주민발전주식회사 주주총회 귀중</p>' +
         auditLines(N).map(function (x) { return (x[0] ? '<p class="ad-h">' + esc(x[0]) + '</p>' : '') + '<p>' + esc(x[1]) + '</p>'; }).join('') + '</div>' +
-        '<div class="bz-end">년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일<br><b>감사 &nbsp; ' + esc(auditorName().split('').join(' ')) + ' &nbsp; (인)</b></div>' + noteHtml(auditNotes(N));
+        '<div class="bz-end">년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일<br><b>감사 &nbsp; ' + esc(auditorName().split('').join(' ')) + ' &nbsp; <span class="ad-seal-wrap">(인)' + (seal ? '<img class="ad-seal" src="' + seal + '" alt="감사 도장">' : '') + '</span></b></div>' +
+        '<p class="no-print" style="text-align:center"><label class="cv-add" style="display:inline-block">🔴 감사 도장 그림 넣기<input type="file" id="adSealFile" accept="image/*" hidden></label>' + (db.auditSeal ? ' <button type="button" class="cv-del" id="adSealDel" style="width:auto;padding:0 8px">도장 빼기</button>' : '') +
+        ' <span id="adSealMsg" class="bz-hint">' + (db.auditSeal ? '앱에 넣은 도장을 씁니다(이 기기에만 저장).' : (auditSealRepo ? '사이트의 audit_stamp.png 도장을 씁니다.' : '도장 그림이 없으면 (인)만 나옵니다.')) + '</span></p>' + noteHtml(auditNotes(N));
     }
     (function () {
       var box = $('bizBox'); if (!box) return;
@@ -4353,7 +4401,16 @@ body{
         out += paraXml('   ' + x[1], B13, 'L') + paraXml('', 9, 'C');
       });
       out += paraXml('', B13, 'C') + paraXml('년        월        일', B13, 'C') + paraXml('', B13, 'C');
-      out += paraXml('감사     ' + auditorName().split('').join('   ') + '     (인)', 40, 'C');
+      var sign = '감사     ' + auditorName().split('').join('   ') + '     (인)', seal = auditSealSrc();
+      if (seal && RPT_FILES && addKeepParaPrs(RPT_FILES)) {   // 감사 도장: 서명 줄을 오른쪽에 맞추고 「(인)」 위에 겹침 (영업보고서 대표 직인과 같은 방식)
+        var b64 = String(seal).split(',')[1], bin = atob(b64), u8 = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        RPT_FILES.filter(function (f) { return f.name === 'BinData/auditseal.png'; }).forEach(function (f) { RPT_FILES.splice(RPT_FILES.indexOf(f), 1); });
+        addBin(RPT_FILES, 'auditseal', u8);
+        var pw = (u8[16] << 24 | u8[17] << 16 | u8[18] << 8 | u8[19]) || 300, ph = (u8[20] << 24 | u8[21] << 16 | u8[22] << 8 | u8[23]) || 300;   // PNG 머리말의 가로·세로
+        out += '<hp:p id="2147483648" paraPrIDRef="' + KEEP_PP.SIGN + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="39">' + sealPicXml(1237872445, 53000 - SIGN_RM - 1100 - 2700, 150, 5400, 'auditseal', pw, ph) + '<hp:t/></hp:run></hp:p>';
+        out += '<hp:p id="2147483648" paraPrIDRef="' + KEEP_PP.SIGN + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="40"><hp:t>' + xe(sign) + '</hp:t></hp:run></hp:p>';
+      } else out += paraXml(sign, 40, 'C');
       // 주민 설명 상자 (재무제표 설명과 같은 모양)
       out += paraXml('', 9, 'C') + tableXml([[{ t: '■ 주민 설명', al: 'L', ch: 25, bf: 49 }]].concat(auditNotes(N).map(function (x) { return [{ t: '· ' + x, al: 'L', ch: 9 }]; })), [50000], 1500);
       return out;
@@ -5639,14 +5696,15 @@ body{
       return true;
     }
     // 회사 직인 그림 (글 뒤, 문단 기준 위치). w = 크기(정사각형에 가깝게)
-    function sealPicXml(id, hOff, vOff, w) {
-      var h = Math.round(w * 6200 / 6300);
+    function sealPicXml(id, hOff, vOff, w, bin, pw, ph) {   // pw·ph: 그림의 픽셀 크기 (없으면 회사 직인 크기)
+      pw = pw || 292.8; ph = ph || 288;
+      var h = Math.round(w * ph / pw), dw = Math.round(pw * 75), dh = Math.round(ph * 75);
       return '<hp:pic id="' + id + '" zOrder="900" numberingType="PICTURE" textWrap="BEHIND_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="' + (id - 1073741823) + '" reverse="0">' +
         '<hp:offset x="0" y="0"/><hp:orgSz width="' + w + '" height="' + h + '"/><hp:curSz width="0" height="0"/><hp:flip horizontal="0" vertical="0"/>' +
         '<hp:rotationInfo angle="0" centerX="' + Math.round(w / 2) + '" centerY="' + Math.round(h / 2) + '" rotateimage="1"/><hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>' +
-        '<hc:img binaryItemIDRef="sealimg" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
+        '<hc:img binaryItemIDRef="' + (bin || 'sealimg') + '" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/>' +
         '<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="' + w + '" y="0"/><hc:pt2 x="' + w + '" y="' + h + '"/><hc:pt3 x="0" y="' + h + '"/></hp:imgRect>' +
-        '<hp:imgClip left="0" right="21960" top="0" bottom="21600"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="21960" dimheight="21600"/><hp:effects/>' +
+        '<hp:imgClip left="0" right="' + dw + '" top="0" bottom="' + dh + '"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="' + dw + '" dimheight="' + dh + '"/><hp:effects/>' +
         '<hp:sz width="' + w + '" widthRelTo="ABSOLUTE" height="' + h + '" heightRelTo="ABSOLUTE" protect="0"/>' +
         '<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="' + vOff + '" horzOffset="' + hOff + '"/>' +
         '<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>회사 직인</hp:shapeComment></hp:pic>';
