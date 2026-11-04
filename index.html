@@ -3409,30 +3409,52 @@ body{
       return { Y: Y, M: M, inc: inc, exp: exp, comp: comp, end: end, cInc: cInc, cExp: cExp, cComp: cComp, units: units, S: S, per: per(comp), cPer: per(cComp),
         next: next, fixAvg: fixAvg, nextExp: nextExp, nextInc: nextInc, nextBal: nextInc == null ? null : end + nextInc - nextExp };
     }
-    // 매월 나가는 지출(송전료·대표·감사 수당·보상금·회계사)의 1월~이번 달 월평균 → 다음 달 예상 지출의 기본
-    var MONTHLY_EXP_RE = /(송전|수당|보상|사람과사람|세무|조정료|김균태|회계)/;
+    // 다음 달 매월 지출 예상 (진욱 님이 정한 방식)
+    //  - 보상금: 늘 1,750만 원으로 봄
+    //  - 기타 지출: 늘 50만 원쯤으로 봄
+    //  - 송전료·대표·감사 수당·회계사: 1년 평균이 아니라 「바로 전 달」 금액 (이번 달 결산서에 적혀 있으면 그것, 없으면 장부의 가장 최근 달)
+    //  - 운영비·부가세·법인세·중간법인세·보험료·토지임대료는 정해진 달에만 따로 더함 (BIG_EXP)
+    var NEXT_COMP = 17500000, NEXT_ETC = 500000;
+    var MONTHLY_ITEMS = [
+      { key: '보상금', re: /보상/ },
+      { key: '송전료', re: /송전/ },
+      { key: '회계사', re: /(사람과사람|김균태|회계사|세무사)/, not: /조정료/ },
+      { key: '수당', re: /(수당|대표|감사)/ }
+    ];
+    function monthlyItemOf(name) {
+      name = String(name || '');
+      for (var k = 0; k < MONTHLY_ITEMS.length; k++) { var it = MONTHLY_ITEMS[k]; if (it.re.test(name) && !(it.not && it.not.test(name))) return it.key; }
+      return null;
+    }
+    function monthTotals(list) {   // 한 달 지출 줄들 → { 송전료: 합, 수당: 합, ... }
+      var t = {};
+      list.forEach(function (r) { var a = Number(r && r.amount) || 0; if (!a) return; var k = monthlyItemOf(r.item); if (k) t[k] = (t[k] || 0) + a; });
+      return t;
+    }
     function monthlyFixedAvg(Y, M) {
-      var d = db.years[Y], sum = 0, n = 0;
-      for (var m = 1; m < M; m++) {   // 지난달까지는 장부에서
-        var rows = (d && d.expense && d.expense[m]) || [], any = false;
-        rows.forEach(function (r) { var a = Number(r && r.amount) || 0; if (!a) return; any = true; if (MONTHLY_EXP_RE.test(String(r.item || ''))) sum += a; });
-        if (any) n++;
-      }
-      var anyNow = false;   // 이번 달은 결산서에서 (지출을 적었을 때만 평균에 넣음)
+      var now = [];
       RPT.querySelectorAll('#incomeExpenseTable tbody tr').forEach(function (tr) {
         var f = tr.querySelectorAll('input:not(.dtcol)'); if (f.length < 4) return;
-        var a = C.parseWon(f[3].value) || 0; if (!a) return; anyNow = true;
-        if (MONTHLY_EXP_RE.test(f[2].value)) sum += a;
+        now.push({ item: f[2].value, amount: C.parseWon(f[3].value) || 0 });
       });
-      if (anyNow) n++;
-      return n ? sum / n : 0;
+      var months = [monthTotals(now)];   // 이번 달 → 지난달 → … (최대 24달 거슬러 봄)
+      for (var k = 1; k <= 24; k++) {
+        var mm = M - k, yy = Y; while (mm < 1) { mm += 12; yy--; }
+        var d = db.years[yy]; months.push(monthTotals((d && d.expense && d.expense[mm]) || []));
+      }
+      var total = NEXT_COMP + NEXT_ETC;
+      ['송전료', '수당', '회계사'].forEach(function (key) {
+        for (var i = 0; i < months.length; i++) { if (months[i][key]) { total += months[i][key]; return; } }
+      });
+      return total;
     }
     // 다음 달 큰 지출 예정: 정해진 달에 나가는 항목 + 예상 금액 (작년 같은 달 → 없으면 가장 최근에 낸 금액 → 없으면 기본값)
     var BIG_EXP = [
       { name: '부가세', months: [1, 4, 7, 10], re: /부가/, step: 1000000 },   // step: 대략 금액 단위 (세금은 해마다 달라 백만 원 단위)
       { name: '운영비', months: [3, 6, 9, 12], re: /운영비/, fix: 11000500 },   // 운영비는 늘 11,000,500원 (11,000,000원 + 은행 수수료 500원)
       { name: '토지임대료', months: [6, 12], re: /임대료/ },
-      { name: '법인세', months: [3], re: /법인세/, not: /중간/, step: 1000000 },
+      { name: '법인세', months: [3], re: /법인세/, not: /(중간|조정료)/, step: 1000000 },   // 「법인세조정료」(회계사 비용)는 법인세가 아님
+      { name: '법인세조정료', months: [3], re: /조정료/ },   // 3월에 회계사에게 내는 법인세 조정 수수료 (작년 금액으로 대략)
       { name: '보험료', months: [5], re: /보험/, def: 10000000 },
       { name: '중간법인세', months: [8], re: /중간/, step: 1000000 }
     ];
