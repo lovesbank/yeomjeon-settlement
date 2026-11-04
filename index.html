@@ -521,6 +521,8 @@ body{
   .ebox input{ width:96px; }
   .ebox .eb-auto{ font-size:14px; font-weight:700; color:#143a63; }
   .ebox .eb-auto input{ width:auto; transform:scale(1.3); margin-right:4px; }
+  #ieQuick .bq-row label{ display:inline-flex; align-items:center; gap:4px; }
+  #ieQuick .bq-row input, #ieQuick .bq-row select{ font:inherit; padding:4px 6px; border:1px solid #bbb; border-radius:4px; }
   #bankQuick .bq-row label{ display:inline-flex; align-items:center; gap:4px; }
   #bankQuick .bq-row input, #bankQuick .bq-row select{ font:inherit; padding:4px 6px; border:1px solid #bbb; border-radius:4px; }
   #bankQuick .bq-tbl{ width:100%; border-collapse:collapse; margin:10px 0; font-size:14px; }
@@ -1124,6 +1126,23 @@ body{
   <!-- =========================================================
        ⏎ 엔터칸 : 위 결산 보고서의 수입 → 매출액, 지출 → 지출내역서
        ========================================================= -->
+  <section id="ieQuick" class="ebox no-print">
+    <div class="eb-title">📝 수입·지출 빠른 입력</div>
+    <p class="eb-desc"><b>1~4차 SMP 날짜</b>(매월 6·13·21·27일)와 <b>지출 적요</b>(매월 송전료·대표.감사수당·보상금·김균태회계사, 그 아래 부가세 1·4·7·10월 / 운영비 3·6·9·12월 / 토지임대료 6·12월 / 법인세 3월 / 중간법인세 8월)는 <b>새 달이 되면 자동</b>으로 들어갑니다. 금액만 적으세요. 그 밖의 수입(KT·rec 등)·지출은 아래에 적고 <b>추가</b>를 누르면 날짜 순서로 들어갑니다.</p>
+    <div class="eb-row bq-row">
+      <label>구분 <select id="iqSide"><option value="inn">수입</option><option value="out">지출</option></select></label>
+      <label>날짜 <input id="iqDate" inputmode="decimal" placeholder="11.10" style="width:5.5em"></label>
+      <label>적요 <input id="iqDesc" placeholder="예: KT 전력예측" style="width:9em"></label>
+      <label>금액 <input id="iqAmt" inputmode="numeric" placeholder="0" style="width:8em"></label>
+      <button type="button" class="eb-btn" id="iqAdd">＋ 추가</button>
+    </div>
+    <div class="eb-row">
+      <button type="button" class="eb-link" id="iqSort">날짜 순서로 다시 정리</button>
+      <button type="button" class="eb-link" id="iqFill">이번 달 기본 날짜·적요 채우기 (빈칸만)</button>
+    </div>
+    <div class="eb-msg" id="iqMsg" aria-live="polite"></div>
+  </section>
+
   <section id="bankQuick" class="ebox no-print">
     <div class="eb-title">🏦 은행 거래 빠른 입력</div>
     <p class="eb-desc">위 결산 보고서의 <b>수입</b>에 금액을 적으면 <b>기업은행 입금</b>으로, <b>지출</b>에 금액을 적으면 <b>농협 출금</b>으로 은행 표에 <b>자동</b>으로 들어갑니다(날짜 칸에 「10.07」처럼 적으면 날짜 순서로 정리). 그 밖의 거래(통장 사이 이체 등)는 아래에 적어 <b>추가</b>를 누르세요. 잔액은 자동으로 다시 계산됩니다.</p>
@@ -1667,6 +1686,10 @@ body{
     });
   }
 
+  /* 수입·지출 자동 기입 기준 (아래 ieAutoBoot에서 씀) */
+  const SMP_DAYS = { 1: 6, 2: 13, 3: 21, 4: 27 };
+  const EXP_MONTHLY = ['송전료', '대표.감사수당', '보상금', '김균태회계사'];
+  const EXP_SEASON = [['부가세', [1, 4, 7, 10]], ['운영비', [3, 6, 9, 12]], ['토지임대료', [6, 12]], ['법인세', [3]], ['중간법인세', [8]]];
   /* ===== 부팅 ===== */
   (function boot(){
     snapshotDefaults();
@@ -1677,6 +1700,7 @@ body{
     const keyNow = storageKeyForMonth(mkNow);
 
     const savedNow = loadStateForKey(keyNow);
+    const isNewMonth = !savedNow;
 
     if(savedNow){
       // 같은 달: 그대로 복원
@@ -1728,8 +1752,90 @@ body{
     autoPatchMonthTextIfDefault();
 
     saveStateForKey(keyNow);
+    ieAutoBoot(keyNow, isNewMonth);
     bankAutoBoot(keyNow);
   })();
+
+  /* =========================================================
+     📝 수입·지출 내역서 자동 기입
+     - 수입 1~4차 SMP 날짜: 매월 6일·13일·21일·27일 (금액만 적으면 됨)
+     - 지출 적요: 매월 「송전료 · 대표.감사수당 · 보상금 · 김균태회계사」, 그 아래 달별 항목
+       부가세 1·4·7·10월 / 운영비 3·6·9·12월 / 토지임대료 6·12월 / 법인세 3월 / 중간법인세 8월
+     - 새 달이 되면 자동으로 채우고, 이번 달은 「기본 칸 채우기」 버튼으로 (빈칸만 채움)
+     - 「수입·지출 빠른 입력」: 날짜·적요·금액을 적으면 빈칸에 넣고 날짜 순서로 다시 정리
+     ========================================================= */
+  function ieMonth(){
+    const tt = RPT.querySelector('.titleText'), mm = tt ? (tt.innerText || tt.textContent || '').match(/(\d{1,2})\s*월/) : null;
+    return mm ? +mm[1] : (new Date().getMonth() + 1);
+  }
+  function ieRows(){   // 각 줄의 [날짜, 적요, 금액] (수입 쪽 / 지출 쪽)
+    return Array.prototype.map.call(RPT.querySelectorAll('#incomeExpenseTable tbody tr'), tr=>{
+      const D = tr.querySelectorAll('input.dtcol'), f = tr.querySelectorAll('input:not(.dtcol)');
+      return { inn: [D[0], f[0], f[1]], out: [D[1], f[2], f[3]] };
+    }).filter(r=>r.inn[0] && r.inn[1] && r.inn[2] && r.out[0] && r.out[1] && r.out[2]);
+  }
+  function ieDefaults(isNewMonth){
+    const m = ieMonth(), rows = ieRows();
+    // 수입: 1~4차 SMP 날짜 (빈 날짜만, 새 달이면 다시 씀)
+    rows.forEach(r=>{
+      const mm = String(r.inn[1].value).match(/(\d)\s*차/);
+      if (mm && SMP_DAYS[+mm[1]] && /smp/i.test(r.inn[1].value) && (isNewMonth || !r.inn[0].value.trim())) r.inn[0].value = m + '.' + String(SMP_DAYS[+mm[1]]).padStart(2, '0');
+    });
+    // 지출 적요
+    const want = EXP_MONTHLY.concat(EXP_SEASON.filter(x=>x[1].indexOf(m) >= 0).map(x=>x[0]));
+    if (isNewMonth) {
+      rows.forEach((r, i)=>{ r.out[0].value = ''; r.out[1].value = want[i] || ''; r.out[2].value = '0'; });
+    } else {
+      const has = n=>rows.some(r=>r.out[1].value.replace(/[\s.,·]/g,'') === n.replace(/[\s.,·]/g,''));
+      want.forEach(n=>{
+        if (has(n)) return;
+        const slot = rows.find(r=>!r.out[1].value.trim() && !toNumber(r.out[2].value));
+        if (slot) slot.out[1].value = n;
+      });
+    }
+  }
+  function dsortKey(s){
+    const t = String(s || '').trim(); let m = t.match(/(\d{1,2})\s*[.\/\-월]\s*(\d{1,2})/);
+    if (m) return (+m[1]) * 100 + (+m[2]);
+    m = t.match(/^(\d{1,2})\s*일?$/); if (m) return ieMonth() * 100 + (+m[1]);
+    return null;
+  }
+  function ieSortSide(side){   // 날짜 있는 것은 날짜 순서로 위에, 날짜 없는 것은 적은 순서대로 그 아래, 빈칸은 맨 아래
+    const rows = ieRows(), items = rows.map((r, i)=>({ d: r[side][0].value, desc: r[side][1].value, amt: r[side][2].value, i }))
+      .filter(x=>x.desc.trim() || toNumber(x.amt));
+    const dated = items.filter(x=>dsortKey(x.d) != null).sort((a,b)=>dsortKey(a.d) - dsortKey(b.d) || a.i - b.i);
+    const undated = items.filter(x=>dsortKey(x.d) == null);
+    const all = dated.concat(undated);
+    rows.forEach((r, i)=>{ const x = all[i]; r[side][0].value = x ? x.d : ''; r[side][1].value = x ? x.desc : ''; r[side][2].value = x ? fmt(toNumber(x.amt)) : '0'; });
+  }
+  function ieAfterChange(keyNow){
+    recalcAll(); scheduleSave(keyNow);
+    try { if (typeof window.__bankSync === 'function') window.__bankSync(); } catch(e){}
+    try { RPT.dispatchEvent(new Event('input')); } catch(e){}
+  }
+  function ieAutoBoot(keyNow, isNewMonth){
+    ieDefaults(isNewMonth);
+    if (isNewMonth) ieSortSide('inn');
+    recalcAll(); saveStateForKey(keyNow);
+    const box = document.getElementById('ieQuick'); if (!box) return;
+    const $q = id=>document.getElementById(id);
+    $q('iqAdd').addEventListener('click', ()=>{
+      const side = $q('iqSide').value, d = $q('iqDate').value.trim(), desc = $q('iqDesc').value.trim(), amt = toNumber($q('iqAmt').value);
+      if (!desc && !amt) { $q('iqMsg').textContent = '⚠ 적요나 금액을 적어 주세요.'; return; }
+      const rows = ieRows(), key = desc.replace(/[\s.,·]/g,'');
+      // 같은 적요인데 금액이 아직 없는 칸(예: 미리 적어 둔 「송전료」)이 있으면 그 칸에, 없으면 빈칸에
+      let slot = key && rows.find(r=>r[side][1].value.replace(/[\s.,·]/g,'') === key && !toNumber(r[side][2].value));
+      if (!slot) slot = rows.find(r=>!r[side][1].value.trim() && !toNumber(r[side][2].value));
+      if (!slot) { $q('iqMsg').textContent = '⚠ 빈칸이 없습니다. 표에서 필요 없는 줄을 지운 뒤 다시 해 주세요.'; return; }
+      slot[side][0].value = d; slot[side][1].value = desc; slot[side][2].value = fmt(amt);
+      ieSortSide(side); ieAfterChange(keyNow);
+      ['iqDate','iqDesc','iqAmt'].forEach(id=>{ $q(id).value = ''; });
+      $q('iqMsg').textContent = '✔ ' + (side === 'inn' ? '수입' : '지출') + '에 넣고 날짜 순서로 정리했습니다.';
+    });
+    $q('iqSort').addEventListener('click', ()=>{ ieSortSide('inn'); ieSortSide('out'); ieAfterChange(keyNow); $q('iqMsg').textContent = '✔ 수입·지출을 날짜 순서로 정리했습니다.'; });
+    $q('iqFill').addEventListener('click', ()=>{ ieDefaults(false); ieAfterChange(keyNow); $q('iqMsg').textContent = '✔ 이번 달 기본 날짜·적요를 빈칸에 채웠습니다(적어 둔 내용은 그대로).'; });
+    $q('iqAmt').addEventListener('blur', e=>{ if (e.target.value) e.target.value = fmt(toNumber(e.target.value)); });
+  }
 
   /* =========================================================
      🏦 은행 입출금 내역 자동 기입
@@ -1811,6 +1917,7 @@ body{
       scheduleSave(keyNow);
       try { RPT.dispatchEvent(new Event('input')); } catch(e){}   // 장부 자동 기입·주민 안내도 다시 계산
     }
+    window.__bankSync = sync;
     function unlock(){
       ['#ibTable','#nhTable'].forEach(sel=>{
         RPT.querySelectorAll(sel + ' tbody input').forEach(el=>{ if (!el.classList.contains('ib-bal') && !el.classList.contains('nh-bal')) el.readOnly = false; });
@@ -2199,7 +2306,7 @@ body{
     var ITEM_RULES = [
       ['식대(이사회 등)',  /(식대|식사|고향집)/],
       ['대표·이사회 수당', /(대표|이사회|아사회|감사|수당|정정국)/],
-      ['세무사·회계',      /(사람과사람|세무|조정료)/],
+      ['세무사·회계',      /(사람과사람|세무|조정료|김균태|회계사)/],   // 사람과사람세무사 = 김균태회계사 (같은 곳)
       ['법무사',           /법무/],
       ['세금',             /(부가|법인세|소득세|주민세|지방세|재산세|세금|국세|원천)/],
       ['송전료',           /송전/],
