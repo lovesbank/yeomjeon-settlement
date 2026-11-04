@@ -3381,16 +3381,16 @@ body{
       });
       return { y: ny, m: nm, list: out };
     }
-    function shareBig(X) {   // 주민에게 가장 중요한 것: 이번 달 1가구당 받는 돈 (크게 표시)
+    function shareBig(X) {   // 주민에게 가장 중요한 것: 올해 누적 1가구당 받은 돈 (크게 표시)
       var S = X.S, ex = +S.extra || 0;
       if (!X.units) return null;
-      return { head: X.M + '월 1가구당 보상금', amt: '약 ' + C.formatWon(X.per) + '원',
-        sub: '이번 달 주민 보상금 ' + C.formatWon(X.comp) + '원 ÷ ' + X.units + '몫 (주주 ' + S.hh + '가구' + (ex ? ' + ' + S.name + ' ' + ex + '몫' : '') + ')' + (ex ? ' · ' + S.name + ' 약 ' + C.formatWon(X.per * ex) + '원' : '') };
+      return { head: '올해 누적(1~' + X.M + '월) 1가구당 보상금', amt: '약 ' + C.formatWon(X.cPer) + '원',
+        sub: '올해 주민 보상금 ' + C.formatWon(X.cComp) + '원 ÷ ' + X.units + '몫 (주주 ' + S.hh + '가구' + (ex ? ' + ' + S.name + ' ' + ex + '몫' : '') + ')' + (ex ? ' · ' + S.name + ' 약 ' + C.formatWon(X.cPer * ex) + '원' : '') };
     }
     function shareLines(X) {
       var w = function (v) { return C.formatWon(v) + '원'; }, S = X.S, ex = +S.extra || 0;
-      var out = ['【이번 달】 전기 판매 수입 ' + w(X.inc) + ', 지출 ' + w(X.exp) + '(이 중 주민 보상금 ' + w(X.comp) + ')이고, 통장에 ' + w(X.end) + '이 남았습니다.'];
-      out.push('【올해 누적 (1~' + X.M + '월)】 수입 ' + w(X.cInc) + ', 지출 ' + w(X.cExp) + ', 주민 보상금 ' + w(X.cComp) + (X.units ? ' → 1가구당 약 ' + w(X.cPer) + (ex ? ', ' + S.name + ' 약 ' + w(X.cPer * ex) : '') : ''));
+      var out = ['【이번 달】 전기 판매 수입 ' + w(X.inc) + ', 지출 ' + w(X.exp) + '(이 중 주민 보상금 ' + w(X.comp) + (X.comp && X.units ? ', 1가구당 약 ' + w(X.per) : '') + ')이고, 통장에 ' + w(X.end) + '이 남았습니다.'];
+      out.push('【올해 누적 (1~' + X.M + '월)】 수입 ' + w(X.cInc) + ', 지출 ' + w(X.cExp) + ', 주민 보상금 ' + w(X.cComp));
       out.push(nextLine(X.next));
       return out;
     }
