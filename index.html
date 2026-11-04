@@ -3491,12 +3491,20 @@ body{
       var w = function (v) { return C.formatWon(v) + '원'; }, S = X.S, ex = +S.extra || 0;
       var out = ['【이번 달】 전기 판매 수입 ' + w(X.inc) + ', 지출 ' + w(X.exp) + '(이 중 주민 보상금 ' + w(X.comp) + (X.comp && X.units ? ', 1가구당 약 ' + w(X.per) : '') + ')이고, 통장에 ' + w(X.end) + '이 남았습니다.'];
       out.push('【올해 누적 (1~' + X.M + '월)】 수입 ' + w(X.cInc) + ', 지출 ' + w(X.cExp) + ', 주민 보상금 ' + w(X.cComp));
+      out.push(bigLine(X));   // 3번째 줄: 다음 달 큰 돈 나갈 것
       out.push(nextLine(X));
       return out;
     }
+    // 【12월 큰 지출 예정】 운영비 약 1,100만 원, 토지임대료 약 1,430만 원 (세금은 백만 원 단위)
+    function bigLine(X) {
+      var N = X.next, h = '【' + N.m + '월 큰 지출 예정】 ';
+      var list = [{ name: '보상금', amt: NEXT_COMP }].concat(N.list);   // 보상금(매달 1,750만 원)도 큰 지출로 맨 앞에
+      return h + list.map(function (e) { return e.name + ' ' + (e.amt ? '약 ' + rough(e.amt, e.step) : '(금액 미정)'); }).join(', ');
+    }
     // 대략 금액: 10만 원 단위 (예: 약 1,100만 원, 약 1억 2,300만 원)
-    function rough(v) {
-      var neg = v < 0, t = Math.round(Math.abs(v) / 100000) * 10, s;
+    function rough(v, step) {
+      step = step || 100000;
+      var neg = v < 0, t = Math.round(Math.abs(v) / step) * (step / 10000), s;
       s = t >= 10000 ? C.formatWon(Math.floor(t / 10000)) + '억' + (t % 10000 ? ' ' + C.formatWon(t % 10000) + '만 원' : ' 원') : C.formatWon(t) + '만 원';
       return (neg ? '-' : '') + s;
     }
@@ -3517,7 +3525,7 @@ body{
       var ni = X.nextInc == null ? '' : C.formatWon(X.nextInc);
       var nextLi = '<li class="nx"><b>' + esc(nextHead(X)) + '</b> 수입 <input class="ni" data-k="nextInc" inputmode="numeric" placeholder="예상 수입 적기" value="' + esc(ni) + '">원, ' +
         hl(esc('지출 약 ' + rough(X.nextExp))) + (X.nextBal != null ? hl(esc(' → 통장 잔액 약 ' + rough(X.nextBal) + ' 예상')) : ' <span class="hint">(예상 수입을 적으면 남을 잔액도 나옵니다)</span>') + '</li>';
-      box.innerHTML = '<div class="sh-h">■ 주민 안내</div>' + big + '<ul>' + shareLines(X).filter(function (x) { return !/^【다음 달/.test(x); }).map(function (x) { return '<li>' + esc(x).replace(/(약 [\d,]+(?:억 [\d,]+만 원|억 원|만 원|원))/g, '<span class="rd">$1</span>').replace(/^(【[^】]+】)/, '<b>$1</b>') + '</li>'; }).join('') + nextLi + '</ul>' +
+      box.innerHTML = '<div class="sh-h">■ 주민 안내</div>' + big + '<ul>' + shareLines(X).filter(function (x) { return x.indexOf(nextHead(X)) !== 0; }).map(function (x) { return '<li>' + esc(x).replace(/(약 [\d,]+(?:억 [\d,]+만 원|억 원|만 원|원))/g, '<span class="rd">$1</span>').replace(/^(【[^】]+】)/, '<b>$1</b>') + '</li>'; }).join('') + nextLi + '</ul>' +
         '<div class="sh-set">나눔 기준: 주주 <input data-k="hh" inputmode="numeric" value="' + esc(S.hh) + '">가구 + <input class="nm" data-k="name" value="' + esc(S.name) + '"> <input data-k="extra" inputmode="numeric" value="' + esc(S.extra) + '">몫 (1천원 단위 반올림, 「보상」이 들어간 지출만 계산)</div>';
     }
     (function () {
