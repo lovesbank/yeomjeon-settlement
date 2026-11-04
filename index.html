@@ -335,7 +335,8 @@ body{
      ========================= */
   #report .rptShare{ margin:10px 0 12px; border:1.5px solid #1f3a68; border-radius:6px; overflow:hidden; font-size:14px; }
   #report .rptShare .sh-h{ background:linear-gradient(#ffffff,#c0cdef); color:#1f3a68; font-weight:900; padding:6px 10px; }
-  #report .rptShare ul{ margin:0; padding:8px 12px 8px 26px; line-height:1.7; font-weight:700; color:#111; }
+  #report .rptShare ul{ margin:0; padding:8px 12px 8px 26px; line-height:1.75; font-weight:700; color:#111; font-size:16px; }
+  #report .bankTbl tbody tr.rowHide{ display:none; }
   #report .rptShare .sh-big{ margin:8px 10px 2px; padding:8px 12px; background:#fff6e0; border:1.5px solid #e0b84c; border-radius:6px; text-align:center; font-weight:900; color:#1f3a68; font-size:17px; line-height:1.5; }
   #report .rptShare .sh-big .amt{ color:#c62828; font-size:26px; letter-spacing:-0.5px; }
   #report .rptShare .sh-big small{ display:block; font-size:13px; font-weight:700; color:#555; }
@@ -1490,6 +1491,27 @@ body{
   function recalcAll(){
     recalcIncomeExpense();
     recalcBank();
+    fitBankRows();
+  }
+
+  /* 은행 입출금 표: 기본 10줄만 보이고, 거래가 10개를 넘으면 그만큼 줄이 늘어남
+     (숨긴 줄도 그대로 있어 저장·잔액 계산은 같음 → 줄어든 자리만큼 주민 안내가 위로 올라옴) */
+  function fitBankRows(){
+    const BANK_MIN_ROWS = 10, sels = ['#ibTable', '#nhTable'];
+    let need = BANK_MIN_ROWS;
+    sels.forEach(sel=>{
+      const t = RPT.querySelector(sel); if (!t) return;
+      let last = -1;
+      t.querySelectorAll('tbody tr').forEach((tr, i)=>{
+        const f = tr.querySelectorAll('input'); if (f.length < 5) return;
+        if (f[0].value.trim() || f[1].value.trim() || toNumber(f[2].value) || toNumber(f[3].value)) last = i;
+      });
+      const extra = t.classList.contains('auto') ? 0 : 1;   // 직접 적을 때는 빈 줄 하나를 더 보여 줌
+      need = Math.max(need, last + 1 + extra);
+    });
+    sels.forEach(sel=>{   // 두 표의 줄 수를 같게 맞춤 (나란히 놓인 표)
+      RPT.querySelectorAll(sel + ' tbody tr').forEach((tr, i)=>{ tr.classList.toggle('rowHide', i >= need); });
+    });
   }
 
   /* =========================================================
@@ -3352,12 +3374,12 @@ body{
     }
     // 다음 달 큰 지출 예정: 정해진 달에 나가는 항목 + 예상 금액 (작년 같은 달 → 없으면 가장 최근에 낸 금액 → 없으면 기본값)
     var BIG_EXP = [
-      { name: '부가세', months: [1, 4, 7, 10], re: /부가/ },
+      { name: '부가세', months: [1, 4, 7, 10], re: /부가/, step: 1000000 },   // step: 대략 금액 단위 (세금은 해마다 달라 백만 원 단위)
       { name: '운영비', months: [3, 6, 9, 12], re: /운영비/, fix: 11000500 },   // 운영비는 늘 11,000,500원 (11,000,000원 + 은행 수수료 500원)
       { name: '토지임대료', months: [6, 12], re: /임대료/ },
-      { name: '법인세', months: [3], re: /법인세/, not: /중간/ },
+      { name: '법인세', months: [3], re: /법인세/, not: /중간/, step: 1000000 },
       { name: '보험료', months: [5], re: /보험/, def: 10000000 },
-      { name: '중간법인세', months: [8], re: /중간/ }
+      { name: '중간법인세', months: [8], re: /중간/, step: 1000000 }
     ];
     function paidIn(Y, m, it) {   // 그 해 그 달에 그 항목으로 나간 금액 (없으면 0)
       var d = db.years[Y], sum = 0;
@@ -3371,14 +3393,14 @@ body{
       var nm = M === 12 ? 1 : M + 1, ny = M === 12 ? Y + 1 : Y, out = [];
       BIG_EXP.forEach(function (it) {
         if (it.months.indexOf(nm) < 0) return;
-        if (it.fix) { out.push({ name: it.name, amt: it.fix, how: '고정' }); return; }
+        if (it.fix) { out.push({ name: it.name, amt: it.fix, how: '고정', step: it.step }); return; }
         var amt = paidIn(ny - 1, nm, it), how = '작년 같은 달';
         if (!amt) {   // 가장 최근에 낸 금액 (최대 2년 전까지 거슬러 봄)
           for (var k = 1; k <= 24 && !amt; k++) { var mm = nm - k, yy = ny; while (mm < 1) { mm += 12; yy--; } amt = paidIn(yy, mm, it); }
           how = '최근';
         }
         if (!amt && it.def) { amt = it.def; how = '예상'; }
-        out.push({ name: it.name, amt: amt, how: how });   // 반올림 없이 실제 낸 금액 그대로 (은행 수수료 포함)
+        out.push({ name: it.name, amt: amt, how: how, step: it.step });   // 반올림 없이 실제 낸 금액 그대로 (은행 수수료 포함)
       });
       return { y: ny, m: nm, list: out };
     }
@@ -3398,13 +3420,15 @@ body{
     function nextLine(N) {
       var h = '【다음 달(' + N.m + '월) 큰 지출 예정】 ';
       if (!N.list.length) return h + '정해진 큰 지출 없음 (매월 송전료·수당·보상금 등만 나감)';
-      return h + N.list.map(function (e) { return e.name + ' ' + (e.amt ? (e.how === '고정' ? '' : '약 ') + C.formatWon(e.amt) + '원' + (e.how === '예상' ? '(예상)' : '') : '(금액 미정)'); }).join(', ') + ' — 지난 지출 기준 예상 금액';
+      // 모두 대략 금액으로: 기본 10만 원 단위(약 1,100만 원), 세금(법인세·중간법인세·부가세)은 백만 원 단위(약 800만 원)
+      function rough(v, step) { step = step || 100000; var t = Math.round(v / step) * (step / 10000); return t >= 10000 ? C.formatWon(Math.floor(t / 10000)) + '억 ' + (t % 10000 ? C.formatWon(t % 10000) + '만 원' : '원') : C.formatWon(t) + '만 원'; }
+      return h + N.list.map(function (e) { return e.name + ' ' + (!e.amt ? '(금액 미정)' : '약 ' + rough(e.amt, e.step)); }).join(', ') + ' — 지난 지출 기준 대략적인 예상 금액';
     }
     function renderShare() {
       var box = $('rptShare'); if (!box || box.contains(document.activeElement)) return;
       var X = shareCalc(), S = X.S;
       var B = shareBig(X), big = B ? '<div class="sh-big">' + esc(B.head) + ' &nbsp;<span class="amt">' + esc(B.amt) + '</span><small>' + esc(B.sub) + '</small></div>' : '';
-      box.innerHTML = '<div class="sh-h">■ 주민 안내</div>' + big + '<ul>' + shareLines(X).map(function (x) { return '<li' + (/^【다음 달/.test(x) ? ' class="nx"' : '') + '>' + esc(x).replace(/(약 [\d,]+원)/g, '<span class="rd">$1</span>').replace(/^(【[^】]+】)/, '<b>$1</b>') + '</li>'; }).join('') + '</ul>' +
+      box.innerHTML = '<div class="sh-h">■ 주민 안내</div>' + big + '<ul>' + shareLines(X).map(function (x) { return '<li' + (/^【다음 달/.test(x) ? ' class="nx"' : '') + '>' + esc(x).replace(/(약 [\d,]+(?:억 [\d,]+만 원|억 원|만 원|원))/g, '<span class="rd">$1</span>').replace(/^(【[^】]+】)/, '<b>$1</b>') + '</li>'; }).join('') + '</ul>' +
         '<div class="sh-set">나눔 기준: 주주 <input data-k="hh" inputmode="numeric" value="' + esc(S.hh) + '">가구 + <input class="nm" data-k="name" value="' + esc(S.name) + '"> <input data-k="extra" inputmode="numeric" value="' + esc(S.extra) + '">몫 (1천원 단위 반올림, 「보상」이 들어간 지출만 계산)</div>';
     }
     (function () {
@@ -3488,7 +3512,7 @@ body{
         yy = table(bx, yy, [bw * 0.3, bw * 0.7], [[{ t: prevL[k] || '전월이월액', bg: '#e8eef9', wt: 700, color: NAVY }, { t: val(bk[1]), al: 'right', color: RED, wt: 700 }]], 36, 17) + 8;
         var cols = [bw * 0.14, bw * 0.2, bw * 0.22, bw * 0.22, bw * 0.22];
         var rows = [[{ t: '날 짜', wt: 700 }, { t: '적 요', wt: 700 }, { t: '입 금', bg: BLUE, wt: 700 }, { t: '출 금', bg: PEACH, wt: 700 }, { t: '잔 액', bg: MINT, wt: 700 }]];
-        RPT.querySelectorAll(bk[0] + ' tbody tr').forEach(function (tr, i) {
+        RPT.querySelectorAll(bk[0] + ' tbody tr:not(.rowHide)').forEach(function (tr, i) {
           var f = tr.querySelectorAll('input'), z = i % 2 ? ZEBRA : '#fff';
           rows.push([{ t: v(f[0]), bg: z }, { t: v(f[1]), bg: z }, { t: v(f[2]), al: 'right', bg: z }, { t: v(f[3]), al: 'right', bg: z }, { t: v(f[4]), al: 'right', bg: z }]);
         });
@@ -3499,8 +3523,8 @@ body{
       y = Math.max(bottoms[0], bottoms[1]) + 12; R(P - 1, bankTop - 1, TW + 2, y - bankTop + 2, null, 3); y += 20;
       // 주민 안내 (1가구당 보상금은 크게, 설명은 굵게)
       var X = shareCalc(), Bg = shareBig(X), sl = shareLines(X), lines = [];
-      sl.forEach(function (x) { g.font = font(19, 700); var line = '', nx = /^【다음 달/.test(x); ('· ' + x).split('').forEach(function (ch) { if (g.measureText(line + ch).width > TW - 30 && line) { lines.push({ t: line, nx: nx }); line = ch; } else line += ch; }); if (line) lines.push({ t: line, nx: nx }); });
-      var bigH = Bg ? 108 : 0, bh = 44 + bigH + lines.length * 29 + 12; R(P, y, TW, 40, BLUE); R(P, y, TW, bh, null, 2);
+      sl.forEach(function (x) { g.font = font(21, 700); var line = '', nx = /^【다음 달/.test(x); ('· ' + x).split('').forEach(function (ch) { if (g.measureText(line + ch).width > TW - 30 && line) { lines.push({ t: line, nx: nx }); line = ch; } else line += ch; }); if (line) lines.push({ t: line, nx: nx }); });
+      var bigH = Bg ? 108 : 0, bh = 44 + bigH + lines.length * 32 + 14; R(P, y, TW, 40, BLUE); R(P, y, TW, bh, null, 2);
       T('■ 주민 안내', P + 14, y + 21, 20, 800, NAVY);
       var yb = y + 48;
       if (Bg) {
@@ -3512,7 +3536,7 @@ body{
         T(Bg.sub, W / 2, yb + 76, fit(Bg.sub, 17, 700, TW - 50), 700, '#555', 'center');
         yb += bigH;
       }
-      lines.forEach(function (l, i) { T(l.t, P + 14, yb + 12 + i * 29, 19, 700, l.nx ? '#8a4b00' : INK); }); y += bh + 20;
+      lines.forEach(function (l, i) { T(l.t, P + 14, yb + 14 + i * 32, 21, 700, l.nx ? '#8a4b00' : INK); }); y += bh + 20;
       // 날짜 · 서명 상자 + 직인 (두 줄 그대로, 크기만 작게)
       var dTop = y, DH = 112; R(P, dTop, TW, DH, '#fff', 3);
       var dt = txt($('reportDateText')), sign = txt(RPT.querySelector('.signLine')), spx = fit(sign, 25, 800, TW - 120);
@@ -3584,7 +3608,7 @@ body{
       var titles = Array.prototype.map.call(RPT.querySelectorAll('.bankTopTitle'), txt);
       var prevLbl = Array.prototype.map.call(RPT.querySelectorAll('.prevRow .label'), txt);
       var data = banks.map(function (bk) {
-        return Array.prototype.map.call(RPT.querySelectorAll(bk[0] + ' tbody tr'), function (tr) {
+        return Array.prototype.map.call(RPT.querySelectorAll(bk[0] + ' tbody tr:not(.rowHide)'), function (tr) {
           var f = tr.querySelectorAll('input'), blank = !f[0].value.trim() && !f[1].value.trim() && !C.parseWon(f[2].value) && !C.parseWon(f[3].value);
           return [f[0].value, f[1].value, blank || !C.parseWon(f[2].value) ? '' : f[2].value, blank || !C.parseWon(f[3].value) ? '' : f[3].value, blank ? '' : f[4].value];
         });
