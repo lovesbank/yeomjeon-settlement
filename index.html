@@ -1786,7 +1786,9 @@ body{
     if (isNewMonth) {
       rows.forEach((r, i)=>{ r.out[0].value = ''; r.out[1].value = want[i] || ''; r.out[2].value = '0'; });
     } else {
-      const has = n=>rows.some(r=>r.out[1].value.replace(/[\s.,·]/g,'') === n.replace(/[\s.,·]/g,''));
+      const norm = v=>String(v).replace(/[\s.,·]/g,'');
+      const same = (a, b)=>norm(a) === norm(b) || (/사람과사람|김균태/.test(norm(a)) && /사람과사람|김균태/.test(norm(b)));   // 사람과사람세무사 = 김균태회계사
+      const has = n=>rows.some(r=>same(r.out[1].value, n));
       want.forEach(n=>{
         if (has(n)) return;
         const slot = rows.find(r=>!r.out[1].value.trim() && !toNumber(r.out[2].value));
@@ -1808,6 +1810,15 @@ body{
     const all = dated.concat(undated);
     rows.forEach((r, i)=>{ const x = all[i]; r[side][0].value = x ? x.d : ''; r[side][1].value = x ? x.desc : ''; r[side][2].value = x ? fmt(toNumber(x.amt)) : '0'; });
   }
+  function ieCompactSide(side){   // 빈 줄(적요·금액 모두 없음)을 없애고 아래 줄을 위로 올림 (순서는 그대로)
+    const rows = ieRows();
+    const items = rows.map(r=>({ d: r[side][0].value, desc: r[side][1].value, amt: r[side][2].value })).filter(x=>x.desc.trim() || toNumber(x.amt));
+    let gap = false, seenEmpty = false;
+    rows.forEach(r=>{ const empty = !r[side][1].value.trim() && !toNumber(r[side][2].value); if (empty) seenEmpty = true; else if (seenEmpty) gap = true; });
+    if (!gap) return false;
+    rows.forEach((r, i)=>{ const x = items[i]; r[side][0].value = x ? x.d : ''; r[side][1].value = x ? x.desc : ''; r[side][2].value = x ? fmt(toNumber(x.amt)) : '0'; });
+    return true;
+  }
   function ieAfterChange(keyNow){
     recalcAll(); scheduleSave(keyNow);
     try { if (typeof window.__bankSync === 'function') window.__bankSync(); } catch(e){}
@@ -1817,6 +1828,15 @@ body{
     ieDefaults(isNewMonth);
     if (isNewMonth) ieSortSide('inn');
     recalcAll(); saveStateForKey(keyNow);
+    // 표에서 줄을 지우고 표 밖을 누르면 빈 줄 아래 내용이 위로 올라감
+    const tbl = RPT.querySelector('#incomeExpenseTable');
+    tbl.addEventListener('focusout', ()=>{
+      setTimeout(()=>{
+        if (tbl.contains(document.activeElement)) return;   // 아직 표 안에서 입력 중이면 기다림
+        const a = ieCompactSide('inn'), b = ieCompactSide('out');
+        if (a || b) ieAfterChange(keyNow);
+      }, 0);
+    });
     const box = document.getElementById('ieQuick'); if (!box) return;
     const $q = id=>document.getElementById(id);
     $q('iqAdd').addEventListener('click', ()=>{
