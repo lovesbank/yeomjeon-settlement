@@ -5368,9 +5368,10 @@ body{
           var doc = new DOMParser().parseFromString(new TextDecoder().decode(sf.data), 'application/xml'), sec = doc.documentElement;
           var ps = kids(sec, 'p'), keep = ps.filter(function (p) { return p.getElementsByTagNameNS(HP, 'secPr').length; })[0];
           Array.prototype.slice.call(sec.childNodes).forEach(function (n) { if (n !== keep) sec.removeChild(n); });
-          if (keep) Array.prototype.slice.call(keep.getElementsByTagNameNS(HP, 'pageNum')).forEach(function (pn) { var ctrl = pn.parentNode; ctrl.parentNode.removeChild(ctrl); });   // 쪽 번호는 뺌
+          var BL = blocksFn();
+          if (keep && !BL.pageNum) Array.prototype.slice.call(keep.getElementsByTagNameNS(HP, 'pageNum')).forEach(function (pn) { var ctrl = pn.parentNode; ctrl.parentNode.removeChild(ctrl); });   // 한 장짜리(위임장·통지서)는 쪽 번호 뺌, 의사록·회의록은 원본 양식의 「- 1 -」 그대로   // 쪽 번호는 뺌
           useMalgun(files);
-          var body = docXml(blocksFn(), files);
+          var body = docXml(BL, files);
           var frag = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '" xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core">' + body + '</root>', 'application/xml');
           if (frag.getElementsByTagName('parsererror').length) throw new Error('문서 변환 오류');
           Array.prototype.slice.call(frag.documentElement.childNodes).forEach(function (n) { sec.appendChild(doc.importNode(n, true)); });
@@ -6217,7 +6218,7 @@ body{
         try { E.blocks.forEach(function (b) { delete b._pg; delete b._y; }); return docImages(E.blocks, false, 297 / 210); }
         finally { DOC_FS = a; DOC_LS = l; }
       }
-      function out() { var b = JSON.parse(JSON.stringify(E.blocks, edStrip)); if (E.fillBody) b.fillBody = true; if (E.ls) b.ls = E.ls; return b; }
+      function out() { var b = JSON.parse(JSON.stringify(E.blocks, edStrip)); if (E.fillBody) b.fillBody = true; if (E.ls) b.ls = E.ls; if (/^(min|board)$/.test(id)) b.pageNum = true; return b; }
       // 되돌리기: 고칠 때마다(잠깐 멈출 때마다) 바로 전 상태를 쌓아 둠 (최대 60단계)
       function state() { return JSON.stringify({ b: E.blocks, ls: E.ls, fs: E.fs }, edStrip); }
       function record() { var st = state(); if (E.skip || E.cur == null) { E.cur = st; E.skip = false; return; } if (st !== E.cur) { E.hist.push(E.cur); if (E.hist.length > 60) E.hist.shift(); E.cur = st; } undoLabel(); }
@@ -6724,6 +6725,11 @@ body{
             var ins = document.querySelectorAll('#tocBox input[data-i]'), changed = false;   // 차례의 쪽 번호를 실제 PDF 쪽에 맞춤 (이번 PDF에만, 직접 적은 쪽은 그대로)
             keys.forEach(function (k, i) { var el = ins[i]; if (!el || M[k] == null || (db.toc && db.toc[i])) return; if (String(el.value) !== String(M[k])) { el.value = M[k]; changed = true; } });
             var out = changed ? domSectionCanvases(ANNUAL_IDS) : first;
+            out.forEach(function (cv, i) {   // 쪽 번호 「- n -」 (표지는 빼고, 차례의 쪽 번호와 같은 번호)
+              if (!i) return; var g = cv.getContext('2d'), w = cv.width;   // A4 폭의 비율로: 글자 약 10pt, 아래에서 약 6mm (아래 여백 안)
+              g.save(); g.fillStyle = '#333'; g.font = Math.round(w * 0.017) + 'px ' + DOC_FONT; g.textAlign = 'center'; g.textBaseline = 'middle';
+              g.fillText('- ' + (i + 1) + ' -', w / 2, cv.height - Math.round(w * 0.03)); g.restore();
+            });
             try { renderToc(); } catch (e) { }
             ok(out);
           } catch (e) { no(e); }
