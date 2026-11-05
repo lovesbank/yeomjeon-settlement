@@ -3098,8 +3098,11 @@ body{
           if (!window.confirm('지금 장부를 백업 파일 내용으로 바꿉니다. 계속할까요?')) return;
           delete d.itemsReport;   // 항목별 합계는 불러온 뒤 장부에서 다시 계산
           db = d;
+          fixData();   // 처음 열 때와 똑같이 자료 손질 → 다시 열지 않아도 숫자가 같게
           start();
+          try { syncYM(); syncReportHeads(true); preview(); fitLedger(); } catch (e2) { }
           markBackup();   // 방금 불러온 백업과 같으므로 알림 없음
+          setTimeout(function () { try { save(); markBackup(); } catch (e3) { } }, 1500);   // 불러온 뒤 화면이 자료를 정리한 것까지 포함해서 (다시 열었을 때 「바뀐 내용」 알림이 잘못 뜨지 않게)
         } catch (err) { window.alert('백업 파일을 읽을 수 없습니다: ' + err.message); }
       };
       r.readAsText(f, 'utf-8');
@@ -3117,7 +3120,9 @@ body{
       if (!window.confirm('장부 자료를 모두 지우고 처음 자료로 되돌릴까요? (먼저 백업 저장을 권장)')) return;
       try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* 무시 */ }
       db = clone(window.SEED);
+      fixData();
       start();
+      try { syncYM(); syncReportHeads(true); preview(); fitLedger(); } catch (e2) { }
     });
 
     /* =========================================================
@@ -4185,7 +4190,9 @@ body{
     var NOTE_AUTO = {};
     function noteOv(key, lines) {
       NOTE_AUTO[key] = lines.slice();
-      var v = db.noteEdit && db.noteEdit[key], out = v != null ? String(v).split('\n').map(function (x) { return x.trim(); }).filter(Boolean) : lines.slice();
+      var v = db.noteEdit && db.noteEdit[key];
+      if (v && typeof v === 'object') v = v.auto === lines.join('\n') ? v.txt : null;   // 고친 뒤 장부 숫자가 바뀌어 자동 문장이 달라지면 → 다시 자동 문장 (옛 숫자가 남지 않게)
+      var out = v != null ? String(v).split('\n').map(function (x) { return x.trim(); }).filter(Boolean) : lines.slice();
       out._k = key; return out;
     }
     function noteHtml(lines) { return '<div class="off-note"' + (lines._k ? ' data-note="' + lines._k + '"' : '') + '><div class="off-note-h">💬 주민 설명</div><ul>' + lines.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>'; }
@@ -6382,7 +6389,7 @@ body{
             '<div class="ed-opt"><span>크기</span>' + seg(G.key, 'size', [['auto', '자동'], ['one', '한 장에 맞춤'], ['split', '나눠도 됨']]) + '</div>' +
             (G.table ? '<div class="ed-opt"><span>표 늘리기</span>' + seg(G.key, 'fill', [['auto', '자동'], ['off', '안 늘림']]) + '</div>' : '') +
             G.notes.map(function (k) {
-              var ov = db.noteEdit && db.noteEdit[k] != null, txt = ov ? db.noteEdit[k] : (NOTE_AUTO[k] || []).join('\n');
+              var nv = db.noteEdit && db.noteEdit[k], at = (NOTE_AUTO[k] || []).join('\n'), ov = !!(nv && (typeof nv !== 'object' || nv.auto === at)), txt = ov ? (typeof nv === 'object' ? nv.txt : nv) : at;
               return '<div class="ed-note"><div class="ed-nh">💬 주민 설명' + (ov ? ' <small>직접 고침</small> ' + btn('note0', k, '↺ 자동 문장으로') : '') + '</div><textarea data-note="' + esc(k) + '">' + esc(txt) + '</textarea></div>';
             }).join('') + '</div>';
         });
@@ -6412,7 +6419,7 @@ body{
         ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px';
         if (!db.noteEdit) db.noteEdit = {};
         var v = ta.value.replace(/\r/g, ''), auto = (NOTE_AUTO[k] || []).join('\n');
-        if (v.trim() === auto.trim()) delete db.noteEdit[k]; else db.noteEdit[k] = v;
+        if (v.trim() === auto.trim()) delete db.noteEdit[k]; else db.noteEdit[k] = { auto: auto, txt: v };   // 지금 자동 문장과 함께 기억
         save();
       });
       d.addEventListener('change', function (e) {
@@ -7771,6 +7778,8 @@ body{
       renderAll();
     }
     db = load();
+    // 장부 자료 손질 (처음 열 때 + 백업 불러오기·처음 자료로 되돌린 뒤에도 똑같이). 이미 된 것은 건너뜀
+    function fixData() {
     // 한 번만: 2026년 1~10월 발전량·월별 SMP 단가 (위탁운영사 자료, 2026-11-04 받음) — 빈 칸에만 채움
     // 2025년은 2025년 결산서(상·하반기 운영 보고서)의 월별 발전량·SMP 단가
     (function seedGen() {
@@ -7818,6 +7827,8 @@ body{
         }
       } catch (e) { /* 무시 */ }
     })();
+    }
+    fixData();
     start();
     syncYM();
     syncReportHeads(true);
