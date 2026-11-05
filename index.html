@@ -4341,7 +4341,11 @@ body{
     });
     function bizEndHtml(N) { return rpDateInput('date', '영업보고서', '대표이사가 영업보고서를 작성(이사회 승인)한 날. 상법 제447조의3: 정기총회 6주 전까지 감사에게 제출.') + '<div class="bz-end">위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.<br>' + rpDateHtml('date') + '<br><b>염전마을주민발전주식회사 &nbsp; 대표이사 &nbsp; ' + esc(ceoName().split('').join(' ')) + ' &nbsp; <span class="seal-in">(인)<img src="' + sealImgEl.src + '" alt=""></span></b></div>'; }   // (인) 위에 회사 직인
     function bizEndXml(N) {
-      var head = paraXml('', 9, 'C') + paraXml('위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.', 39, 'C') + paraXml(dateTxt(bizData().date, '년        월        일'), 39, 'C');
+      var endT = '위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.', dT = dateTxt(bizData().date, '년        월        일');
+      // 맺음말·날짜는 줄 간격 160% 가운데 문단으로 (100%면 한글 앱에서 두 줄이 겹쳐 보임)
+      var c160 = function (t) { return '<hp:p id="2147483648" paraPrIDRef="' + KEEP_PP.C + '" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="39"><hp:t>' + xe(t) + '</hp:t></hp:run></hp:p>'; };
+      var head = RPT_FILES && addKeepParaPrs(RPT_FILES) ? paraXml('', 9, 'C') + c160(endT) + paraXml('', 9, 'C') + c160(dT)
+        : paraXml('', 9, 'C') + paraXml(endT, 39, 'C') + paraXml('', 9, 'C') + paraXml(dT, 39, 'C');
       var sign = '염전마을주민발전주식회사   대표이사   ' + ceoName().split('').join(' ') + '   (인)';
       // 한글 파일로 만들 때: 서명 줄을 오른쪽에 맞추고(오른쪽 여백) 「(인)」 위에 회사 직인
       if (RPT_FILES && addKeepParaPrs(RPT_FILES)) {
@@ -7654,12 +7658,13 @@ body{
       if (!m || +m[1] !== 45) return false;   // 양식이 다르면 덧붙이지 않음 (그냥 보통 문단으로)
       var add = '';
       // [원본 id, 새 id, 다음 문단과 함께, 오른쪽 여백]
-      [[27, KEEP_PP.R, 1, 1], [31, KEEP_PP.L, 1, 0], [30, KEEP_PP.C, 1, 0], [27, KEEP_PP.SIGN, 0, 1]].forEach(function (pr) {
+      [[27, KEEP_PP.R, 1, 1], [31, KEEP_PP.L, 1, 0], [30, KEEP_PP.C, 1, 0, 160], [27, KEEP_PP.SIGN, 0, 1]].forEach(function (pr) {   // C: 가운데 + 줄 간격 160% (영업보고서 맺음말·날짜)
         var base = x.match(new RegExp('<hh:paraPr id="' + pr[0] + '"[\\s\\S]*?<\\/hh:paraPr>'));
         if (!base) return;
         var t = base[0].replace('id="' + pr[0] + '"', 'id="' + pr[1] + '"');
         if (pr[2]) t = t.replace('keepWithNext="0"', 'keepWithNext="1"');
         if (pr[3]) t = t.split('<hc:right value="0" unit="HWPUNIT"/>').join('<hc:right value="' + SIGN_RM + '" unit="HWPUNIT"/>');
+        if (pr[4]) t = t.split('<hh:lineSpacing type="PERCENT" value="100" unit="HWPUNIT"/>').join('<hh:lineSpacing type="PERCENT" value="' + pr[4] + '" unit="HWPUNIT"/>');
         add += t;
       });
       if ((add.match(/<hh:paraPr /g) || []).length !== 4) return false;
