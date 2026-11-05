@@ -853,6 +853,16 @@ body{
 
   /* PDF 저장 모드 (버튼이 body에 pm-… 를 붙이고 인쇄 창을 엶) */
   #sec-print{ display:none; }
+  .px-pick{ margin:10px 0; } .px-pick b{ display:block; margin-bottom:6px; color:#1f3a68; font-size:16px; }
+  .px-pick select{ width:100%; max-width:420px; padding:12px 10px; border:2px solid #1f3a68; border-radius:10px; background:#fff; color:#111; font-size:17px; font-weight:700; }
+  .mt-box{ margin:10px 0; padding:12px 14px; border:2px solid #1f3a68; border-radius:10px; background:#f3f7fd; font-size:15px; }
+  .mt-box > b{ display:block; margin-bottom:8px; color:#1f3a68; font-size:16px; }
+  .mt-box label{ display:block; margin:6px 0; } .mt-box input{ width:100%; max-width:420px; box-sizing:border-box; margin-top:3px; padding:10px; border:1px solid #9fb0c9; border-radius:8px; font-size:16px; background:#fff; }
+  .mt-box .bz-hint{ display:block; margin-top:6px; }
+  @media print{ .mt-box{ display:none !important; } }
+  .px-rel{ display:block; margin-top:8px; font-size:15px; } .px-rel input{ width:100%; max-width:420px; box-sizing:border-box; margin-top:4px; padding:10px; border:1px solid #9fb0c9; border-radius:8px; font-size:16px; }
+  .px-none{ margin:10px 0; padding:12px 14px; border:2px solid #e0a030; border-radius:10px; background:#fff8ec; color:#7a4a00; font-size:15px; line-height:1.6; }
+  @media print{ .px-pick, .px-none{ display:none !important; } }
   #docEd{ position:fixed; inset:0; z-index:9990; background:#eef1f6; display:flex; flex-direction:column; font-family:inherit; color:#111; }
   #docEd button{ font-family:inherit; cursor:pointer; }
   #docEd .ed-top{ display:flex; align-items:center; gap:8px; padding:calc(10px + env(safe-area-inset-top)) 12px 10px; background:linear-gradient(135deg,#1f3a68,#2c5a9e); color:#fff; font-size:16px; }
@@ -5976,12 +5986,29 @@ body{
       bl.push({ k: 'sign', t: '염전마을주민발전주식회사   대표이사   ' + spaced(ceo) + '   (인)', seal: true });
       return bl;
     }
+    // 총회 일시·장소 입력 (위임장·소집통지서 칸): 표지 「총회 날짜」, 의사록 「시각·장소」와 같은 자리에 저장 → 모든 서류가 함께 바뀜
+    function meetHtml() {
+      var M = minData(), dv = titleData().date || '';
+      return '<div class="no-print mt-box"><b>📅 정기주주총회 날짜 · 시각 · 장소</b>' +
+        '<label>날짜 <input type="date" data-meet="date" value="' + esc(dv) + '"></label>' +
+        '<label>시각 <input data-meet="time" value="' + esc(M.time || '') + '" placeholder="예: 오전 10시"></label>' +
+        '<label>장소 <input data-meet="place" value="' + esc(M.place || '') + '" placeholder="예: 염전마을 회관"></label>' +
+        '<span class="bz-hint">' + (dv ? '✔ ' + titleDate().txt + ' ' + wdayOf(dv) + ' — 표지·소집통지서·위임장·의사록에 같이 들어갑니다.' : '날짜를 넣으면 표지·소집통지서·위임장·의사록에 같이 들어갑니다.') + '</span></div>';
+    }
+    document.addEventListener('change', function (e) {
+      var k = e.target.getAttribute && e.target.getAttribute('data-meet'); if (!k) return;
+      var v = String(e.target.value || '').trim();
+      if (k === 'date') titleData().date = v; else minData()[k] = v;
+      save(); e.target.blur();
+      setTimeout(function () { try { renderAll(); paintTitle(); var t = $('tpDate'); if (t) t.value = titleData().date || ''; } catch (er) { } }, 0);
+    });
     function renderNotice() {
       var box = $('noticeBox'); if (!box || box.contains(document.activeElement)) return;
       var D = titleDate(), Nd = noticeData(), warn = '';
       if (D.no && Nd.sent) { var days = Math.round((new Date(D.no) - new Date(Nd.sent)) / 86400000); warn = days >= 10 ? '<span class="check ok">✔ 총회 ' + days + '일 전 발송 (정관 제17조: 10일 전까지)</span>' : '<span class="check warn">⚠ 총회 ' + days + '일 전 — 정관 제17조는 총회일 10일 전까지 통지해야 합니다 (주주 전원 동의가 있으면 단축 가능)</span>'; }
       box.innerHTML = '<div class="cv-title">정기주주총회 소집 통지서</div>' +
         '<p class="bz-hint no-print">총회 날짜는 표지의 「총회 날짜」, 시각·장소·안건은 아래 「정기주주총회 의사록」에서 그대로 가져옵니다.</p>' +
+        meetHtml() +
         '<p class="no-print">발송일 <input type="date" id="ntSent" value="' + esc(Nd.sent || '') + '"> ' + warn + '</p>' +
         docButtons('notice') + docPreview(noticeBlocks());
     }
@@ -6000,9 +6027,10 @@ body{
       var bl = [];
       list.forEach(function (h, i) {
         if (i) bl.push({ k: 'pb' });
-        var sh = h ? parseInt(String(h.s || '').replace(/\D/g, ''), 10) || 0 : 0, adr = h ? String(h.a || '') : '';
-        if (/^백수(로|하사리)/.test(adr)) adr = '백수읍 ' + adr.replace(/^백수(?=하사리)/, '');
-        if (/^(백수읍|염산면)/.test(adr)) adr = '전라남도 영광군 ' + adr;
+        var sh = h ? parseInt(String(h.s || '').replace(/\D/g, ''), 10) || 0 : 0, adr = pxAddr(h);
+        // 대리인: 위임장 칸에서 고른 사람 (주주명부에 있으면 생년월일·주소 자동). 위임인 본인 장에는 넣지 않음
+        var AG = db.proxyAgent || {}, agN = String(AG.n || '').replace(/\s+/g, ''), agH = agN ? H.filter(function (x) { return String(x.n).replace(/\s+/g, '') === agN; })[0] : null;
+        if (h && agN && String(h.n).replace(/\s+/g, '') === agN) { agN = ''; agH = null; }
         bl.push({ k: 'title', t: '위   임   장' });
         bl.push({ k: 'p', t: '본인은 염전마을주민발전주식회사 제' + gi + '기 정기주주총회(' + (D.no ? D.txt + ' ' + wdayOf(D.no) : '　　년　　월　　일') + ' ' + (M.time || '') + ', ' + (M.place || '') + ')에서 아래 대리인에게 본인 소유 주식의 의결권 행사에 관한 일체의 권한을 위임합니다(상법 제368조 제2항, 정관 제21조 제2항).', ind: 0, after: true });
         bl.push({ k: 'tbl', w: [1.4, 3.6], rows: [
@@ -6013,10 +6041,10 @@ body{
           [{ t: '소유 주식', h: true }, { t: sh ? '보통주 ' + sh + '주 (의결권 ' + sh + '개)' : '보통주        주 (의결권        개)' }]] });
         bl.push({ k: 'tbl', w: [1.4, 3.6], rows: [
           [{ t: '대리인', cs: 2, h: true }],
-          [{ t: '성    명', h: true }, { t: '' }],
-          [{ t: '생년월일', h: true }, { t: '' }],
-          [{ t: '주    소', h: true }, { t: '' }],
-          [{ t: '주주와의 관계', h: true }, { t: '' }]] });
+          [{ t: '성    명', h: true }, { t: agN }],
+          [{ t: '생년월일', h: true }, { t: agH && agH.b ? birthOf(agH.b) : '' }],
+          [{ t: '주    소', h: true }, { t: agN ? pxAddr(agH) : '' }],
+          [{ t: '주주와의 관계', h: true }, { t: agN ? String(AG.rel || '') : '' }]] });
         bl.push({ k: 'p', t: '위임 사항', b: true, ind: 0 });
         bl.push({ k: 'p', t: '1. 아래 회의 목적 사항에 대한 의결권 행사 일체', ind: 1 });
         bl.push({ k: 'p', t: P.q.replace(/ \((보통|특별)결의\)$/, ''), ind: 2 });
@@ -6031,13 +6059,27 @@ body{
       return bl;
     }
     function proxyWho() { return (db.proxyWho == null ? '' : db.proxyWho); }
+    function pxAddr(h) {   // 주주명부 주소 → 위임장 주소 (백수·염산은 「전라남도 영광군」부터)
+      var adr = h ? String(h.a || '') : '';
+      if (/^백수(로|하사리)/.test(adr)) adr = '백수읍 ' + adr.replace(/^백수(?=하사리)/, '');
+      if (/^(백수읍|염산면)/.test(adr)) adr = '전라남도 영광군 ' + adr;
+      return adr;
+    }
     function renderProxy() {
       var box = $('proxyBox'); if (!box || box.contains(document.activeElement)) return;
       var H = holders().filter(function (h) { return String(h.n || '').trim(); }), cur = proxyWho();
       box.innerHTML = '<div class="cv-title">위 임 장</div>' +
+        meetHtml() +
         '<p class="bz-hint no-print">주주명부에서 이름을 고르면 그 주주의 이름·생년월일·주소·주식 수가 들어갑니다. 「주주 전원」을 고르면 한 사람에 한 장씩 모두 만듭니다(한글 파일은 한 파일, 사진은 여러 장).</p>' +
-        '<p class="no-print">주주 <select id="pxWho"><option value="">빈 위임장 (직접 적기)</option><option value="*"' + (cur === '*' ? ' selected' : '') + '>주주 전원 (' + H.length + '장)</option>' +
+        (H.length ? '' : '<div class="no-print px-none">⚠ 아직 주주명부가 없어서 주주 이름을 고를 수 없습니다.<br>주주명부 한글 파일(.hwpx)을 먼저 불러오세요. 불러오면 아래 목록에 주주 ' + '이름이 나옵니다.<br><label for="hdFile" class="cv-add" style="display:inline-block;margin-top:8px">📂 주주명부 한글 파일(.hwpx) 불러오기</label></div>') +
+        '<p class="no-print px-pick"><b>① 주주 고르기 ▼</b><select id="pxWho"><option value="">빈 위임장 (직접 적기)</option><option value="*"' + (cur === '*' ? ' selected' : '') + '>주주 전원 (' + H.length + '장)</option>' +
         H.map(function (h) { var n = String(h.n).replace(/\s+/g, ''); return '<option value="' + esc(n) + '"' + (cur === n ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></p>' +
+        (function () {   // ② 대리인
+          var AG = db.proxyAgent || {}, an = String(AG.n || '');
+          return '<p class="no-print px-pick"><b>② 대리인 ▼</b><select id="pxAgent"><option value="">비워 두기 (손으로 적기)</option>' +
+            H.map(function (h) { var n = String(h.n).replace(/\s+/g, ''); return '<option value="' + esc(n) + '"' + (an === n ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>' +
+            (an ? '<span class="px-rel">주주와의 관계 <input id="pxRel" value="' + esc(AG.rel || '') + '" placeholder="예: 대표이사, 같은 마을 주주"></span><span class="bz-hint" style="display:block">대리인 성명·생년월일·주소는 주주명부에서 자동으로 들어갑니다. 「주주 전원」으로 만들면 대리인 본인 장에는 대리인 칸을 비워 둡니다.</span>' : '') + '</p>';
+        })() +
         docButtons('proxy') + docPreview(proxyBlocks(cur === '*' ? (H[0] ? String(H[0].n).replace(/\s+/g, '') : '') : cur)) + (cur === '*' && H.length > 1 ? '<p class="bz-hint no-print" style="text-align:center">(첫 번째 주주만 미리 보여 줍니다. 저장하면 ' + H.length + '명 모두 만들어집니다)</p>' : '');
     }
     // 정기주주총회 의사록 → 문단 목록 (PDF용, 한글 파일 의사록과 같은 내용) + 정관 변경 대비표
@@ -6726,7 +6768,14 @@ body{
     DOC_DEF.proxy = { title: '위임장', fill: true, blocks: function () { return proxyBlocks(proxyWho()); }, name: function () { var w2 = proxyWho(); return '위임장' + (w2 === '*' ? '_주주전원' : w2 ? '_' + w2 : ''); } };
     (function () {
       var box = $('proxyBox'); if (!box) return;
-      box.addEventListener('change', function (e) { if (e.target.id !== 'pxWho') return; db.proxyWho = e.target.value; save(); e.target.blur(); renderProxy(); });
+      box.addEventListener('change', function (e) {
+        var id = e.target.id;
+        if (id === 'pxWho') db.proxyWho = e.target.value;
+        else if (id === 'pxAgent') { var o = db.proxyAgent || {}; db.proxyAgent = { n: e.target.value, rel: e.target.value ? (o.rel || (/김진욱/.test(e.target.value) ? '대표이사' : '')) : '' }; }
+        else if (id === 'pxRel') { db.proxyAgent = db.proxyAgent || {}; db.proxyAgent.rel = e.target.value.trim(); }
+        else return;
+        save(); e.target.blur(); renderProxy();
+      });
     })();
 
     /* ── 정관 (2025.01.27 시행본) — 정관 변경 안건에서 조항을 적으면 현행 문구를 자동으로 보여 주고, 개정 문구를 의사록·대비표에 넣음
@@ -7207,12 +7256,12 @@ body{
       if (!P.ok1) warn.push('제1호');
       P.extra.forEach(function (x, i) { if (!x.ok) warn.push('제' + (i + 2) + '호'); });
       var reg = P.extra.some(function (x) { return x.reg; });
-      box.innerHTML = '<div class="cv-title">' + esc(P.title) + '</div><div class="mn-body">' +
+      box.innerHTML = '<div class="cv-title">' + esc(P.title) + '</div>' + meetHtml() + '<div class="mn-body">' +
         '<p class="no-print"><button type="button" class="cv-add" id="mnPng" style="display:inline-block">📷 의사록 사진으로 저장</button> <button type="button" class="cv-add ed-open" data-docedit="min" style="display:inline-block">🔍 미리보기 · 고치기 → 한글 / PDF 저장</button> <span id="mnPngMsg" class="bz-hint"></span></p>' +
         '<p class="no-print bz-hint">상법 제373조(의사록)와 공증 때 확인하는 사항(정족수·의결권 수·결의 요건·의장과 출석 이사 날인)을 갖춘 양식입니다. 주주 33명이 12주씩, 대표이사가 4주를 더 가져 <b>출석 의결권 = 출석 주주 수 × 12주 + 4주</b>로 자동 계산합니다(실제와 다르면 「출석 의결권」 칸에 직접 적으세요). 안건 이름을 적으면 결과 문장과 의결권 수가 자동으로 들어갑니다.</p>' +
         '<p>' + esc(P.lead) + '</p>' +
         '<p>1. 회 사 명 : 염전마을주민발전주식회사 &nbsp; 본점 ' + inp('addr', 'w', '등기부상 본점 주소') + '</p>' +
-        '<p>2. 일 &nbsp;&nbsp; 시 : ' + esc(P.date) + ' ' + inp('time', '', '오전 10시') + ' <span class="bz-hint no-print">(날짜는 표지의 「총회 날짜」)</span></p>' +
+        '<p>2. 일 &nbsp;&nbsp; 시 : ' + esc(P.date) + ' ' + inp('time', '', '오전 10시') + ' <span class="bz-hint no-print">(날짜는 위 📅 칸)</span></p>' +
         '<p>3. 장 &nbsp;&nbsp; 소 : ' + inp('place', 'w', '염전마을 회관') + '</p>' +
         '<p>4. 의 &nbsp;&nbsp; 장 : 대표이사 ' + esc(P.ceo[2]) + '</p>' +
         '<p>5. 주주 현황 : 주주 총수 ' + (HA.count ? '<b>' + HA.count + '</b>' : inp('holders', '', '명')) + '명, 발행주식 총수 ' + total + '주 <span class="no-print bz-hint">(1가구 ' + inp('perShare', '', '12') + '주, 대표이사 추가 ' + inp('ceoExtra', '', '4') + '주)</span></p>' +
