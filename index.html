@@ -855,6 +855,9 @@ body{
   #sec-print{ display:none; }
   .px-pick{ margin:10px 0; } .px-pick b{ display:block; margin-bottom:6px; color:#1f3a68; font-size:16px; }
   .px-pick select{ width:100%; max-width:420px; padding:12px 10px; border:2px solid #1f3a68; border-radius:10px; background:#fff; color:#111; font-size:17px; font-weight:700; }
+  .rp-dt{ margin:12px 0 6px; padding:10px 12px; border:2px solid #1f3a68; border-radius:10px; background:#f3f7fd; font-size:15px; }
+  .rp-dt b{ color:#1f3a68; } .rp-dt input{ padding:8px; border:1px solid #9fb0c9; border-radius:8px; font-size:16px; background:#fff; } .rp-dt .bz-hint{ display:block; margin-top:6px; }
+  @media print{ .rp-dt{ display:none !important; } }
   .mt-box{ margin:10px 0; padding:12px 14px; border:2px solid #1f3a68; border-radius:10px; background:#f3f7fd; font-size:15px; }
   .mt-box > b{ display:block; margin-bottom:8px; color:#1f3a68; font-size:16px; }
   .mt-box label{ display:block; margin:6px 0; } .mt-box input{ width:100%; max-width:420px; box-sizing:border-box; margin-top:3px; padding:10px; border:1px solid #9fb0c9; border-radius:8px; font-size:16px; background:#fff; }
@@ -4321,9 +4324,24 @@ body{
       return r;
     }
     // 영업보고서 맺음말 (영업보고서 마지막 장 맨 아래)
-    function bizEndHtml(N) { return '<div class="bz-end">위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.<br>년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일<br><b>염전마을주민발전주식회사 &nbsp; 대표이사 &nbsp; ' + esc(ceoName().split('').join(' ')) + ' &nbsp; <span class="seal-in">(인)<img src="' + sealImgEl.src + '" alt=""></span></b></div>'; }   // (인) 위에 회사 직인
+    // 영업보고서·감사보고서 작성 날짜 (연도별, bizData().date / .adate). 비우면 「년 월 일」 빈칸
+    function rpDateHtml(k) { var v = bizData()[k]; return v ? esc(dateTxt(v)) : '년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일'; }
+    function rpDateInput(k, label, hint) {
+      var v = bizData()[k] || '';
+      return '<p class="no-print rp-dt"><b>📅 ' + label + ' 날짜</b> <input type="date" data-rpd="' + k + '" value="' + esc(v) + '">' + (v ? ' <button type="button" class="cv-del" data-rpd0="' + k + '" style="width:auto;padding:0 8px">비우기</button>' : '') + '<span class="bz-hint">' + hint + '</span></p>';
+    }
+    document.addEventListener('change', function (e) {
+      var k = e.target.getAttribute && e.target.getAttribute('data-rpd'); if (!k) return;
+      bizData()[k] = e.target.value || ''; save(); e.target.blur();
+      setTimeout(function () { try { renderAll(); } catch (er) { } }, 0);
+    });
+    document.addEventListener('click', function (e) {
+      var k = e.target.getAttribute && e.target.getAttribute('data-rpd0'); if (!k) return;
+      delete bizData()[k]; save(); setTimeout(function () { try { renderAll(); } catch (er) { } }, 0);
+    });
+    function bizEndHtml(N) { return rpDateInput('date', '영업보고서', '대표이사가 영업보고서를 작성(이사회 승인)한 날. 상법 제447조의3: 정기총회 6주 전까지 감사에게 제출.') + '<div class="bz-end">위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.<br>' + rpDateHtml('date') + '<br><b>염전마을주민발전주식회사 &nbsp; 대표이사 &nbsp; ' + esc(ceoName().split('').join(' ')) + ' &nbsp; <span class="seal-in">(인)<img src="' + sealImgEl.src + '" alt=""></span></b></div>'; }   // (인) 위에 회사 직인
     function bizEndXml(N) {
-      var head = paraXml('', 9, 'C') + paraXml('위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.', 39, 'C') + paraXml('년        월        일', 39, 'C');
+      var head = paraXml('', 9, 'C') + paraXml('위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.', 39, 'C') + paraXml(dateTxt(bizData().date, '년        월        일'), 39, 'C');
       var sign = '염전마을주민발전주식회사   대표이사   ' + ceoName().split('').join(' ') + '   (인)';
       // 한글 파일로 만들 때: 서명 줄을 오른쪽에 맞추고(오른쪽 여백) 「(인)」 위에 회사 직인
       if (RPT_FILES && addKeepParaPrs(RPT_FILES)) {
@@ -4549,7 +4567,8 @@ body{
       var N = bizNumbers(), seal = auditSealSrc();
       box.innerHTML = '<div class="cv-title">감 사 보 고 서</div><div class="ad-body"><p class="ad-h">염전마을주민발전주식회사 주주총회 귀중</p>' +
         auditLines(N).map(function (x) { return (x[0] ? '<p class="ad-h">' + esc(x[0]) + '</p>' : '') + '<p>' + esc(x[1]) + '</p>'; }).join('') + '</div>' +
-        '<div class="bz-end">년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일<br><b>감사 &nbsp; ' + esc(auditorName().split('').join(' ')) + ' &nbsp; <span class="ad-seal-wrap">(인)' + (seal ? '<img class="ad-seal" src="' + seal + '" alt="감사 도장">' : '') + '</span></b></div>' +
+        rpDateInput('adate', '감사보고서', '감사가 감사를 마치고 보고서를 낸 날. 상법 제447조의4: 영업보고서 등을 받은 날부터 4주 안에 제출.' + (bizData().date && bizData().adate && bizData().adate < bizData().date ? ' <b style="color:#b3261e">⚠ 영업보고서 날짜보다 빠릅니다.</b>' : '')) +
+        '<div class="bz-end">' + rpDateHtml('adate') + '<br><b>감사 &nbsp; ' + esc(auditorName().split('').join(' ')) + ' &nbsp; <span class="ad-seal-wrap">(인)' + (seal ? '<img class="ad-seal" src="' + seal + '" alt="감사 도장">' : '') + '</span></b></div>' +
         '<p class="no-print" style="text-align:center"><label class="cv-add" style="display:inline-block">🔴 감사 도장 그림 넣기<input type="file" id="adSealFile" accept="image/*" hidden></label>' + (db.auditSeal ? ' <button type="button" class="cv-del" id="adSealDel" style="width:auto;padding:0 8px">도장 빼기</button>' : '') +
         ' <span id="adSealMsg" class="bz-hint">' + (db.auditSeal ? '앱에 넣은 도장을 씁니다(이 기기에만 저장).' : (auditSealRepo ? '사이트의 audit_stamp.png 도장을 씁니다.' : '도장 그림이 없으면 (인)만 나옵니다.')) + '</span></p>' + noteHtml(auditNotes(N));
     }
@@ -4597,7 +4616,7 @@ body{
         if (x[0]) out += paraXml(x[0], H13, 'L');
         out += paraXml('   ' + x[1], B13, 'L') + paraXml('', 9, 'C');
       });
-      out += paraXml('', B13, 'C') + paraXml('년        월        일', B13, 'C') + paraXml('', B13, 'C');
+      out += paraXml('', B13, 'C') + paraXml(dateTxt(bizData().adate, '년        월        일'), B13, 'C') + paraXml('', B13, 'C');
       var sign = '감사     ' + auditorName().split('').join('   ') + '     (인)', seal = auditSealSrc();
       if (seal && RPT_FILES && addKeepParaPrs(RPT_FILES)) {   // 감사 도장: 서명 줄을 오른쪽에 맞추고 「(인)」 위에 겹침 (영업보고서 대표 직인과 같은 방식)
         var b64 = String(seal).split(',')[1], bin = atob(b64), u8 = new Uint8Array(bin.length);
