@@ -851,10 +851,19 @@ body{
 
   /* PDF 저장 모드 (버튼이 body에 pm-… 를 붙이고 인쇄 창을 엶) */
   #sec-print{ display:none; }
+  #pdfSheet{ position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; padding:16px; }
+  #pdfSheet .ps-box{ background:#fff; border-radius:16px; padding:22px 18px; width:100%; max-width:380px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,.3); font-family:inherit; }
+  #pdfSheet .ps-t{ font-size:20px; font-weight:800; color:#1f3a68; } #pdfSheet .ps-n{ margin:6px 0 16px; color:#555; font-size:14px; word-break:break-all; }
+  #pdfSheet .ps-go{ display:block; width:100%; box-sizing:border-box; margin:8px 0; padding:14px; border-radius:12px; border:0; background:#1f3a68; color:#fff; font-size:18px; font-weight:800; text-decoration:none; }
+  #pdfSheet .ps-open{ background:#2e7d32; } #pdfSheet .ps-x{ margin-top:6px; background:none; border:0; color:#666; font-size:16px; padding:8px 20px; }
+  #pdfSheet .ps-h{ font-size:13px; color:#777; margin-top:8px; }
+  @media print{ #pdfSheet{ display:none !important; } }
   /* PDF 그림 만들 때: 화면 축소 없이 1000px 그대로, 버튼·안내는 빼고 */
   .pdf-render #ledger main{ transform:none !important; }
   .pdf-render #ledger .lsheet{ box-shadow:none !important; }
   .pdf-render input::placeholder, .pdf-render textarea::placeholder{ color:transparent !important; }
+  .pdf-render .no-print:not(section), .pdf-render #ledger .items-desc, .pdf-render #ledger p.check{ display:none !important; }   /* 안내 글·버튼은 PDF에서 빼고 자리도 없앰 */
+  .pdf-render #ledger input, .pdf-render #ledger textarea, .pdf-render #ledger select{ background:transparent !important; border-color:transparent !important; box-shadow:none !important; }
   @media print{
     body.pm-annual #report, body.pm-min #report, body.pm-board #report{ display:none !important; }
     body.pm-report #ledger{ display:none !important; }
@@ -871,6 +880,7 @@ body{
     #sec-print .doc-cover{ max-width:none; width:100%; border:0; }
     #sec-print .hp-tbl{ width:100%; border-collapse:collapse; font-size:11pt; } #sec-print .hp-tbl th, #sec-print .hp-tbl td{ border:1px solid #333; padding:4px 5px; } #sec-print .hp-tbl th{ background:#e8eef8; -webkit-print-color-adjust:exact; print-color-adjust:exact; } #sec-print .hp-tbl tr{ break-inside:avoid; }
     input::placeholder, textarea::placeholder{ color:transparent !important; }   /* 빈 칸 안내 글씨는 인쇄 안 함 */
+    #ledger .items-desc{ display:none !important; }
     #sec-print .doc-pb{ border:0; margin:0; break-after:page; page-break-after:always; }
     html, body{ background:#fff !important; }   /* 마지막 장 아래 회색 배경 없앰 */
   }
@@ -4583,10 +4593,73 @@ body{
     }
 
     // 문서 맨 앞에: [결산 보고서] + 공식 양식 재무제표 3장, 그다음 장부는 새 쪽부터
+    /* ── 한글 파일 결산서: 장마다 내용 높이를 어림해서 표·주민 설명이 한 장에 들어가게 표 줄 높이를 맞춤 ──
+       (넘치면 표 줄을 줄이고, 휑하면 표 줄을 늘려 한 장을 채움. 표는 글자처럼 붙어 있어 넘치면 통째로 다음 장으로 가므로) */
+    function fitPagesXml(xml, files) {
+      try {
+        var hf = files && files.filter(function (f) { return f.name === 'Contents/header.xml'; })[0]; if (!hf) return xml;
+        var hx = new TextDecoder().decode(hf.data), CH = {}, PP = {}, m, re1 = /<hh:charPr id="(\d+)" height="(\d+)"/g;
+        while ((m = re1.exec(hx))) CH[m[1]] = +m[2];
+        var re2 = /<hh:paraPr id="(\d+)"[\s\S]*?<hp:default>[\s\S]*?<hc:prev value="(-?\d+)"[\s\S]*?<hc:next value="(-?\d+)"[\s\S]*?<hh:lineSpacing type="(\w+)" value="(\d+)"/g;
+        while ((m = re2.exec(hx))) PP[m[1]] = { prev: +m[2], next: +m[3], pct: m[4] === 'PERCENT' ? +m[5] : 160 };
+        var CAP = 84186 - 2835 * 2, WID = 53000;
+        var doc = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '" xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core">' + xml + '</root>', 'application/xml');
+        if (doc.getElementsByTagName('parsererror').length) return xml;
+        var top = Array.prototype.filter.call(doc.documentElement.childNodes, function (n) { return n.nodeType === 1 && n.localName === 'p'; });
+        function tw(t, fh) { var u = 0; for (var i = 0; i < t.length; i++) u += t.charCodeAt(i) >= 0x1100 ? fh : fh * 0.55; return u; }
+        function pH(p, width) {   // 문단 높이 (줄바꿈 어림)
+          var pp = PP[p.getAttribute('paraPrIDRef')] || { prev: 0, next: 0, pct: 160 }, run = p.getElementsByTagNameNS(HP, 'run')[0], fh = CH[run && run.getAttribute('charPrIDRef')] || 1000;
+          var txt = Array.prototype.map.call(p.getElementsByTagNameNS(HP, 't'), function (t) { return t.textContent; }).join('');
+          var lines = Math.max(1, Math.ceil(tw(txt, fh) * 1.03 / width));
+          return lines * fh * Math.max(100, pp.pct) / 100 * 1.08 + pp.prev + pp.next;
+        }
+        function tblH(tb, sc) {   // 표 높이: 줄마다 (칸 최소 높이 × sc) 와 칸 글자 높이 중 큰 값
+          var H = 566;
+          Array.prototype.forEach.call(tb.getElementsByTagNameNS(HP, 'tr'), function (tr) {
+            var mx = 0;
+            Array.prototype.forEach.call(tr.getElementsByTagNameNS(HP, 'tc'), function (tc) {
+              var sz = tc.getElementsByTagNameNS(HP, 'cellSz')[0], span = tc.getElementsByTagNameNS(HP, 'cellSpan')[0], rs = span ? +span.getAttribute('rowSpan') || 1 : 1;
+              var cm = tc.getElementsByTagNameNS(HP, 'cellMargin')[0], w = sz ? +sz.getAttribute('width') : 10000, h0 = sz ? +sz.getAttribute('height') / rs : 1000, th = cm ? (+cm.getAttribute('top') || 0) + (+cm.getAttribute('bottom') || 0) : 282;
+              Array.prototype.forEach.call(tc.getElementsByTagNameNS(HP, 'p'), function (p) { th += pH(p, Math.max(2000, w - 1100)); });
+              mx = Math.max(mx, h0 * sc, th);
+            });
+            H += mx;
+          });
+          return H;
+        }
+        var pages = [[]];
+        top.forEach(function (p) { if (p.getAttribute('pageBreak') === '1' && pages[pages.length - 1].length) pages.push([]); pages[pages.length - 1].push(p); });
+        pages.forEach(function (pg) {
+          if (pg.some(function (p) { return p.getElementsByTagNameNS(HP, 'pic').length; })) return;   // 그림 있는 장(표지)은 그대로
+          var tbls = []; pg.forEach(function (p) { Array.prototype.forEach.call(p.childNodes, function (r) { if (r.localName === 'run') Array.prototype.forEach.call(r.childNodes, function (x) { if (x.localName === 'tbl') tbls.push(x); }); }); });
+          if (!tbls.length) return;
+          function est(sc) { return pg.reduce(function (a, p) { var tb = tbls.filter(function (t) { return t.parentNode && t.parentNode.parentNode === p; }); return a + (tb.length ? tb.reduce(function (b, t) { return b + tblH(t, sc); }, 0) + 200 : pH(p, WID)); }, 0); }
+          var e1 = est(1), sc = 1;
+          if (est(0.4) > CAP * 0.96) {   // 줄 높이를 줄여도 넘치면 표 안 글줄 간격을 160% → 100%로 (원본 양식에 있는 문단 모양 23·25·35)
+            var CMP = { '21': '23', '11': '23', '22': '25', '20': '25', '24': '25', '26': '35', '27': '35', '29': '35' };
+            tbls.forEach(function (tb) {
+              Array.prototype.forEach.call(tb.getElementsByTagNameNS(HP, 'p'), function (p) { var k = CMP[p.getAttribute('paraPrIDRef')]; if (k && PP[k]) p.setAttribute('paraPrIDRef', k); });
+              Array.prototype.forEach.call(tb.getElementsByTagNameNS(HP, 'cellMargin'), function (cm) { cm.setAttribute('top', '40'); cm.setAttribute('bottom', '40'); });   // 칸 위아래 여백도 줄임
+            });
+            e1 = est(1);
+          }
+          if (e1 > CAP * 0.96) { var lo = 0.4, hi = 1; for (var i = 0; i < 14; i++) { var mid = (lo + hi) / 2; if (est(mid) <= CAP * 0.94) lo = mid; else hi = mid; } sc = lo; }
+          else if (e1 < CAP * 0.85) { var lo2 = 1, hi2 = 3; for (var j = 0; j < 14; j++) { var md = (lo2 + hi2) / 2; if (est(md) <= CAP * 0.92) lo2 = md; else hi2 = md; } sc = lo2; }
+          (window.__fitLog = window.__fitLog || []).push([Array.prototype.map.call(pg[0].getElementsByTagNameNS(HP, 't'), function (t) { return t.textContent; }).join('').slice(0, 12), Math.round(e1 / CAP * 100), Math.round(sc * 100) / 100, Math.round(est(sc) / CAP * 100)]);
+          if (Math.abs(sc - 1) < 0.02) return;
+          tbls.forEach(function (tb) {
+            Array.prototype.forEach.call(tb.getElementsByTagNameNS(HP, 'cellSz'), function (z) { z.setAttribute('height', Math.max(600, Math.round(+z.getAttribute('height') * sc))); });
+            var szs = Array.prototype.filter.call(tb.childNodes, function (n) { return n.localName === 'sz'; })[0]; if (szs) szs.setAttribute('height', Math.round(tblH(tb, 1)));
+          });
+        });
+        return Array.prototype.map.call(doc.documentElement.childNodes, function (n) { return new XMLSerializer().serializeToString(n); }).join('').replace(/ xmlns:hp="[^"]*"/g, '').replace(/ xmlns:hc="[^"]*"/g, '');
+      } catch (e) { return xml; }
+    }
     function insertReport(doc, withReport, Y, files) {
       var sec = doc.documentElement;
       var off = titleXml(files) + coverXml(Y) + tocXml(Y, withReport) + bizXml(Y) + cmpXml(Y) + auditXml(Y) + offXml(Y);   // 결산 앞장 → 영업보고서 → 감사보고서 → 재무제표   // 결산 앞장 → 재무상태표 → 손익계산서 → 이익잉여금처분계산서
       if (!withReport) off = off.replace('pageBreak="1"', 'pageBreak="0"');   // 보고서가 없으면 첫 장부터
+      off = fitPagesXml(off, files);   // 표·주민 설명이 한 장에 들어가게, 휑한 장은 표 줄을 늘려 채움
       var body = (withReport ? reportXml() : '') + off;
       if (!body) return;
       var frag = new DOMParser().parseFromString('<root xmlns:hp="' + HP + '" xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core">' + body + '</root>', 'application/xml');
@@ -5247,13 +5320,13 @@ body{
       });
       // 이번 달 예상 지출: 보상금(1가구당 금액 × 몫) + 기타 50만 원 + 송전료·수당·회계사(바로 전 달) + 그 달 정해진 큰 지출
       var S = shareInfo(), units = (+S.hh || 0) + (+S.extra || 0), comp = (parseInt(String(B.per).replace(/\D/g, ''), 10) || 0) * units;
-      var fixed = 0; ['송전료', '수당', '회계사'].forEach(function (k) {
-        for (var b2 = 0; b2 < 24; b2++) { var mm = PM - b2, yy = PY; while (mm < 1) { mm += 12; yy--; } var dd = db.years[yy], t = monthTotals((dd && dd.expense && dd.expense[mm]) || []); if (t[k]) { fixed += t[k]; return; } }
+      var fixed = 0, fixedItems = {}; ['수당', '송전료', '회계사'].forEach(function (k) {   // 바로 전 달(없으면 그 앞 달) 금액
+        for (var b2 = 0; b2 < 24; b2++) { var mm = PM - b2, yy = PY; while (mm < 1) { mm += 12; yy--; } var dd = db.years[yy], t = monthTotals((dd && dd.expense && dd.expense[mm]) || []); if (t[k]) { fixed += t[k]; fixedItems[k] = t[k]; return; } }
       });
       var big = nextBigExpenses(PY, PM), bigSum = big.list.reduce(function (a, e) { return a + (e.amt || 0); }, 0);
       var expN = comp + NEXT_ETC + fixed + bigSum, incN = String(B.inc).trim() === '' ? (S.nextInc && S.nextInc[PY + '-' + PM]) : parseInt(String(B.inc).replace(/\D/g, ''), 10);
       incN = incN == null || incN === '' ? null : Number(incN) || 0;
-      return { Y: Y, M: Mn, PY: PY, PM: PM, bal: bal, inc: inc, items: items, etc: etc, tot: tot, others: oOrder.map(function (n) { return [n, others[n]]; }), units: units, comp: comp, big: big, expN: expN, incN: incN, balN: incN == null ? null : bal + incN - expN };
+      return { fixedItems: fixedItems, Y: Y, M: Mn, PY: PY, PM: PM, bal: bal, inc: inc, items: items, etc: etc, tot: tot, others: oOrder.map(function (n) { return [n, others[n]]; }), units: units, comp: comp, big: big, expN: expN, incN: incN, balN: incN == null ? null : bal + incN - expN };
     }
     // 안건 이름 → 이사회 회의 내용 (보내 주신 회의록 말투: □ 큰 항목, ○ 작은 항목, - 세부). 정관 조항은 이사회 의결 사항(제34조) 기준
     function boardAgendaLines(q, no, X) {
@@ -5265,14 +5338,16 @@ body{
       if (/기타/.test(t)) { b('□ ' + ceo + ' 대표이사가 기타 안건을 질문하자 ' + (X.etc || '안건 제시가 없어 회의를 마무리하였다') + (/[.]$/.test(X.etc || '') ? '' : '.'), 1); return L; }
       if (/보상/.test(t)) {
         b(open, 1);
+        // 보내 주신 회의록 틀: 전달 통장잔액(장부) → 이번 달 예상 수입(적는 칸) → 총수입 → 이번 달 예상 지출(항목별 대략, 자동) → 예상 잔액
         b('○ ' + N.PM + '월 통장잔액 : ' + w(N.bal) + '원', 2);
-        b('○ ' + N.PM + '월 총수입액 : ' + w(N.inc) + '원', 2);
-        b('○ ' + N.PM + '월 지출 (합계 ' + w(N.tot) + '원)', 2);
-        [['수당', '대표·감사 수당'], ['송전료', '송전료'], ['보상금', '보상금'], ['회계사', '회계사(세무사) 수수료']].forEach(function (k) { if (N.items[k[0]]) b('- ' + k[1] + ' : ' + w(N.items[k[0]]) + '원', 3); });
-        N.others.forEach(function (o) { b('- ' + o[0] + ' : ' + w(o[1]) + '원', 3); });
-        if (N.etc) b('- 기 타 : ' + w(N.etc) + '원', 3);
         b('○ ' + N.M + '월 예상 수입액 : ' + (N.incN == null ? '약 　　　　만 원' : '약 ' + rough(N.incN)), 2);
-        b('○ ' + N.M + '월 예상 총지출액 : 약 ' + rough(N.expN) + (N.big.list.length ? ' (' + N.big.list.map(function (e) { return e.name; }).join('·') + ' 포함)' : ''), 2);
+        b('○ ' + N.M + '월 총수입액 (통장잔액 + 예상 수입) : ' + (N.incN == null ? '약 　　　　만 원' : '약 ' + rough(N.bal + N.incN)), 2);
+        b('○ ' + N.M + '월 예상 지출', 2);
+        if (N.comp) b('- 보상금 : 약 ' + rough(N.comp), 3);
+        N.big.list.forEach(function (e) { b('- ' + e.name + ' : 약 ' + rough(e.amt || 0, e.step), 3); });
+        [['수당', '대표·감사 수당'], ['송전료', '송전료'], ['회계사', '회계사(세무사) 수수료']].forEach(function (k) { if (N.fixedItems[k[0]]) b('- ' + k[1] + ' : 약 ' + rough(N.fixedItems[k[0]]), 3); });
+        b('- 기 타 : 약 ' + rough(NEXT_ETC), 3);
+        b('○ ' + N.M + '월 예상 총지출액 : 약 ' + rough(N.expN), 2);
         b('○ ' + N.M + '월 예상 통장잔액 : ' + (N.balN == null ? '약 　　　　만 원' : '약 ' + rough(N.balN)), 2);
         b('※ 참고사항 ※', 1);
         b('○ 1가구당 ' + rough(X.per).replace(/^약 /, '') + ' 지급 시 지급 총액 : ' + w(N.comp) + '원 (주주 ' + X.S.hh + '가구' + (+X.S.extra ? ' 및 ' + X.S.name + ' ' + X.S.extra + '몫' : '') + ', 총 ' + N.units + '몫)', 2);
@@ -5912,47 +5987,87 @@ body{
       add(xr + 'trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
       return new Blob(parts, { type: 'application/pdf' });
     }
+    // 저장(공유) 창: 바로 열리면 그대로, 시간이 걸려 휴대폰이 막으면(아이폰은 누른 직후만 허용) 「저장·보내기」 버튼을 한 번 더 누르게 함
     function sharePdf(canvases, name, msg) {
-      var blob = makePdf(canvases), file = null;
+      var blob = makePdf(canvases), file = null, n = canvases.length;
       try { file = new File([blob], name, { type: 'application/pdf' }); } catch (e) { }
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: name }).then(function () { if (msg) msg.textContent = '✔ ' + name + ' — 공유 창에서 「파일에 저장」이나 카톡으로 보내면 됩니다.'; })
-          .catch(function (e) { if (msg) msg.textContent = e && e.name === 'AbortError' ? '취소했습니다.' : '⚠ 공유하지 못했습니다: ' + (e && e.message); });
-      } else {
-        var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
-        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-        if (msg) msg.textContent = '✔ ' + name + ' 저장했습니다.';
+      var canShare = !!(file && navigator.canShare && navigator.canShare({ files: [file] }));
+      function done(t) { if (msg) msg.textContent = t; }
+      function sheet() {
+        var old = document.getElementById('pdfSheet'); if (old) old.remove();
+        var url = URL.createObjectURL(blob), d = document.createElement('div'); d.id = 'pdfSheet';
+        d.innerHTML = '<div class="ps-box"><div class="ps-t">📄 PDF가 준비됐습니다</div><div class="ps-n">' + esc(name) + ' · ' + n + '쪽</div>' +
+          (canShare ? '<button type="button" class="ps-go" id="psShare">📤 저장 · 보내기</button>' : '') +
+          '<a class="ps-go ps-open" href="' + url + '" download="' + esc(name) + '" target="_blank" rel="noopener">📂 PDF 열기 · 내려받기</a>' +
+          '<button type="button" class="ps-x" id="psClose">닫기</button><div class="ps-h">아이폰: 「저장 · 보내기」 → 「파일에 저장」 또는 카톡으로 보내기</div></div>';
+        document.body.appendChild(d);
+        d.addEventListener('click', function (e) {
+          if (e.target.id === 'psShare') navigator.share({ files: [file], title: name }).then(function () { done('✔ ' + name + ' 저장(보내기)했습니다.'); d.remove(); }).catch(function (er) { if (!(er && er.name === 'AbortError')) done('⚠ 공유하지 못했습니다: ' + (er && er.message)); });
+          if (e.target.id === 'psClose' || e.target === d) { d.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 60000); }
+        });
+        done('✔ PDF가 준비됐습니다. 「저장 · 보내기」를 누르세요.');
       }
+      if (canShare) {   // 먼저 바로 열어 보고, 안 되면 버튼 창
+        try {
+          navigator.share({ files: [file], title: name }).then(function () { done('✔ ' + name + ' — 「파일에 저장」이나 카톡으로 보내면 됩니다.'); })
+            .catch(function (e) { if (e && e.name === 'AbortError') done('취소했습니다.'); else sheet(); });
+        } catch (e) { sheet(); }
+      } else sheet();
     }
     /* ── 화면에 보이는 문서(표지~결의서)를 그대로 그림으로 옮김: 배경·테두리·글자·입력칸 값·그림을 캔버스에 그리고 A4 쪽으로 나눔 ── */
     function domSectionCanvases(ids) {
-      var root = document.documentElement, S = 2, pages = [];
+      var root = document.documentElement, S = 2, pages = [], restore = [];
+      var pend = null;   // 작은 덩어리(통장잔액·영수증처럼 짧은 것)는 한 장에 같이
+      function hidden(el) { return el.closest('.no-print:not(section), button, .cv-del, .cv-add, script, style') || getComputedStyle(el).visibility === 'hidden'; }
+      function col(v) { return v && v !== 'transparent' && !/rgba\(\d+, \d+, \d+, 0\)/.test(v); }
+      function shown(el) { return !hidden(el) && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().height > 0; }
       root.classList.add('pdf-render');
       try {
         ids.forEach(function (id) {
-          var sec = document.getElementById(id); if (!sec || sec.offsetParent === null && getComputedStyle(sec).display === 'none') return;
-          var R0 = sec.getBoundingClientRect(), W = Math.ceil(R0.width), H = Math.ceil(R0.height); if (W < 50 || H < 20) return;
+          var sec = document.getElementById(id); if (!sec || getComputedStyle(sec).display === 'none') return;
+          // ① 이 부분을 「한 장씩」 덩어리로 나눔: 쪽 나눔(.page-break)마다, 공식 재무제표는 표(.off)마다
+          var kids = [], walk = function (el) { Array.prototype.forEach.call(el.children, function (k) { if (!shown(k) && !k.classList.contains('page-break')) return; if (k.children.length && (k.id && /Box$/.test(k.id) || k.id === 'offBox')) walk(k); else kids.push(k); }); };
+          walk(sec);
+          var groups = [[]];
+          kids.forEach(function (k) {
+            if (k.classList.contains('page-break')) { if (groups[groups.length - 1].length) groups.push([]); return; }
+            if (k.classList.contains('off') && groups[groups.length - 1].some(function (x) { return x.classList.contains('off'); })) groups.push([]);
+            groups[groups.length - 1].push(k);
+          });
+          groups = groups.filter(function (g) { return g.length; });
+          if (!groups.length) return;
+          var W = Math.ceil(sec.getBoundingClientRect().width), PH = Math.round(W * 297 / 210), PAD = 36, ROOM = PH - PAD * 2;
+          function span(g) { var t = 1e9, b = -1e9; g.forEach(function (e) { var r = e.getBoundingClientRect(); t = Math.min(t, r.top); b = Math.max(b, r.bottom); }); return { t: t, b: b, h: b - t }; }
+          // ② 표가 적어 쪽이 휑하면 표의 줄 높이를 늘려 한 장을 채움 (표가 있는 덩어리만, 너무 짧은 것은 다른 것과 한 장에)
+          groups.forEach(function (g) {
+            var h = span(g).h, trs = []; g.forEach(function (e) { Array.prototype.forEach.call(e.matches('tr') ? [e] : e.querySelectorAll('tr'), function (tr) { if (shown(tr)) trs.push(tr); }); });
+            g._small = h < ROOM * 0.35;
+            if (g._small || !trs.length || h >= ROOM * 0.9) return;
+            trs.forEach(function (tr) { restore.push([tr, tr.style.height]); });
+            var base = trs.map(function (tr) { return tr.getBoundingClientRect().height; }), lo = 0, hi = 140;
+            for (var it = 0; it < 12; it++) { var mid = (lo + hi) / 2; trs.forEach(function (tr, i) { tr.style.height = (base[i] + mid) + 'px'; }); if (span(g).h <= ROOM * 0.96) lo = mid; else hi = mid; }
+            trs.forEach(function (tr, i) { tr.style.height = (base[i] + lo) + 'px'; });
+          });
+          // ③ 화면 그대로 그림으로 (배경·테두리·그림 → 입력칸 값 → 글자)
+          var R0 = sec.getBoundingClientRect(), H = Math.ceil(R0.height);
           var c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
           var g = c.getContext('2d'); g.scale(S, S); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.textBaseline = 'middle';
-          var breaks = [];
-          function hidden(el) { return el.closest('.no-print:not(section), button, .cv-del, .cv-add, script, style') || getComputedStyle(el).visibility === 'hidden'; }
-          function col(v) { return v && v !== 'transparent' && !/rgba\(\d+, \d+, \d+, 0\)/.test(v); }
-          var els = sec.querySelectorAll('*');
-          // ① 배경·테두리·그림
+          var els = sec.querySelectorAll('*'), breaks = [], noBreak = [];
           Array.prototype.forEach.call(els, function (el) {
             if (hidden(el)) return; var cs = getComputedStyle(el); if (cs.display === 'none') return;
             var r = el.getBoundingClientRect(); if (!r.width || !r.height) return;
             var x = r.left - R0.left, y = r.top - R0.top;
             if (col(cs.backgroundColor)) { g.fillStyle = cs.backgroundColor; g.fillRect(x, y, r.width, r.height); }
-            [['Top', x, y, r.width, 0], ['Bottom', x, y + r.height, r.width, 0], ['Left', x, y, 0, r.height], ['Right', x + r.width, y, 0, r.height]].forEach(function (b) {
-              var bw = parseFloat(cs['border' + b[0] + 'Width']) || 0; if (!bw || cs['border' + b[0] + 'Style'] === 'none' || !col(cs['border' + b[0] + 'Color'])) return;
-              g.fillStyle = cs['border' + b[0] + 'Color'];
-              if (b[0] === 'Top') g.fillRect(b[1], b[2], b[3], bw); else if (b[0] === 'Bottom') g.fillRect(b[1], b[2] - bw, b[3], bw); else if (b[0] === 'Left') g.fillRect(b[1], b[2], bw, b[4]); else g.fillRect(b[1] - bw, b[2], bw, b[4]);
+            [['Top'], ['Bottom'], ['Left'], ['Right']].forEach(function (b) {
+              var s = b[0], bw = parseFloat(cs['border' + s + 'Width']) || 0; if (!bw || cs['border' + s + 'Style'] === 'none' || !col(cs['border' + s + 'Color'])) return;
+              g.fillStyle = cs['border' + s + 'Color'];
+              if (s === 'Top') g.fillRect(x, y, r.width, bw); else if (s === 'Bottom') g.fillRect(x, y + r.height - bw, r.width, bw); else if (s === 'Left') g.fillRect(x, y, bw, r.height); else g.fillRect(x + r.width - bw, y, bw, r.height);
             });
             if (el.tagName === 'IMG' && el.complete && el.naturalWidth) { try { g.drawImage(el, x, y, r.width, r.height); } catch (e) { } }
-            if (el.tagName === 'TR' || /^(P|H\d|LI|TABLE|DIV)$/.test(el.tagName) && cs.display === 'block') breaks.push(r.bottom - R0.top);
+            if (el.tagName === 'TR') { var nx = el.closest('table'), last = nx && nx.rows[nx.rows.length - 1] === el; if (!last) breaks.push(y + r.height); }
+            if (el.classList.contains('off-note') || el.tagName === 'TEXTAREA' || /^(P|LI)$/.test(el.tagName)) noBreak.push([y - 1, y + r.height + 1]);   // 주민 설명·문단은 자르지 않음
+            if (/(^|\s)(cv-h|off-title|title-box|cv-title|rs-title|off-sub|off-co|bz-sub)(\s|$)/.test(el.className)) noBreak.push([y - 1, y + r.height + 40]);   // 제목 바로 뒤에서 끊지 않음
           });
-          // ② 입력칸에 적힌 값
           Array.prototype.forEach.call(sec.querySelectorAll('input, textarea, select'), function (el) {
             if (hidden(el) || el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'hidden') return;
             var cs = getComputedStyle(el); if (cs.display === 'none') return;
@@ -5965,7 +6080,6 @@ body{
             lines.forEach(function (t, i) { g.textAlign = al === 'center' ? 'center' : (al === 'right' || al === 'end') ? 'right' : 'left'; g.fillText(t, g.textAlign === 'center' ? x + r.width / 2 : g.textAlign === 'right' ? x + r.width - pr : x + pl, y0 + i * lh); });
             g.textAlign = 'left';
           });
-          // ③ 글자: 글자 하나하나의 실제 자리를 재서 같은 줄끼리 이어 그림
           var tw = document.createTreeWalker(sec, NodeFilter.SHOW_TEXT, null), node, rg = document.createRange();
           while ((node = tw.nextNode())) {
             var t = node.nodeValue; if (!t || !t.trim()) continue;
@@ -5981,17 +6095,34 @@ body{
             }
             if (run.trim()) g.fillText(run, rx, ry);
           }
-          // ④ A4 쪽으로 나누기 (줄·표 행 경계에서)
-          var PH = Math.round(W * 297 / 210), PAD = 28, room = PH - PAD * 2, top = 0;
-          breaks = breaks.filter(function (b) { return b > 0 && b <= H; }).sort(function (a, b) { return a - b; });
-          while (top < H - 5) {
-            var end = H;
-            if (H - top > room) { end = top + room; var best = 0; breaks.forEach(function (b) { if (b > top + room * 0.4 && b <= top + room) best = b; }); if (best) end = best; }
-            var o = document.createElement('canvas'); o.width = W * S; o.height = PH * S; var og = o.getContext('2d'); og.fillStyle = '#fff'; og.fillRect(0, 0, o.width, o.height);
-            og.drawImage(c, 0, top * S, W * S, (end - top) * S, 0, PAD * S, W * S, (end - top) * S); pages.push(o); top = end;
-          }
+          function ok(b) { return !noBreak.some(function (z) { return b > z[0] && b < z[1]; }); }
+          // ④ 덩어리마다 A4 쪽으로: 한 장에 들어가면 그대로, 조금 넘치면(1.4배까지) 줄여서 한 장에, 아주 길면 표 줄 사이에서 나눔
+          function newPage() { var o = document.createElement('canvas'); o.width = W * S; o.height = PH * S; var og = o.getContext('2d'); og.fillStyle = '#fff'; og.fillRect(0, 0, o.width, o.height); pages.push(o); return og; }
+          function put(og, top, h, dy, sc) { var dw = W * sc, dx = (W - dw) / 2; og.drawImage(c, 0, top * S, W * S, h * S, dx * S, dy * S, dw * S, h * sc * S); }
+          groups.forEach(function (gr, gi) {
+            pages._map = pages._map || {}; pages._map[id + '#' + gi] = pages.length + (gr._small && pend && pend.used + 30 + span(gr).h + 8 <= ROOM ? 0 : 1);   // 이 덩어리가 시작하는 쪽 (차례용)
+            var sp = span(gr), top = Math.max(0, sp.t - R0.top - 4), h = Math.min(H - top, sp.h + 8);
+            if (gr._small) {   // 짧은 것: 앞 장에 자리가 있으면 그 아래에
+              if (pend && pend.used + 30 + h <= ROOM) { put(pend.g, top, h, PAD + pend.used + 30, 1); pend.used += 30 + h; return; }
+              var og0 = newPage(); put(og0, top, h, PAD, 1); pend = { g: og0, used: h }; return;
+            }
+            pend = null;
+            if (gr.length === 1 && gr[0].tagName === 'IMG') { var iw = gr[0].getBoundingClientRect().width, isc = Math.min(ROOM / h, W / Math.max(1, iw)); put(newPage(), top, h, PAD + (ROOM - h * isc) / 2, isc); return; }   // 표지 그림: 한 장 가득
+            if (h <= ROOM) { put(newPage(), top, h, PAD, 1); return; }
+            if (h <= ROOM * 1.4) { put(newPage(), top, h, PAD, ROOM / h); return; }   // 조금 넘치면 살짝 줄여 한 장에
+            var cur = top, end = top + h;
+            while (cur < end - 4) {
+              var lim = cur + ROOM, cut = end;
+              if (end > lim) { cut = 0; breaks.concat(noBreak.map(function (z) { return z[1]; })).forEach(function (b) { if (b > cur + ROOM * 0.3 && b <= lim && ok(b) && b > cut) cut = b; }); if (!cut) cut = lim; }
+              if (end - cut < ROOM * 0.25 && end - cur <= ROOM * 1.4) { put(newPage(), cur, end - cur, PAD, ROOM / (end - cur)); break; }   // 끝에 조금만 남으면 줄여서 한 장에
+              put(newPage(), cur, cut - cur, PAD, 1); cur = cut;
+            }
+          });
         });
-      } finally { root.classList.remove('pdf-render'); }
+      } finally {
+        restore.reverse().forEach(function (r) { r[0].style.height = r[1]; });
+        root.classList.remove('pdf-render');
+      }
       return pages;
     }
     var ANNUAL_IDS = ['sec-title', 'sec-cover', 'sec-toc', 'sec-biz', 'sec-cmp', 'sec-audit', 'sec-off', 'sec-revenue', 'sec-expense', 'sec-items', 'sec-summary', 'sec-accounts', 'sec-receipt', 'sec-resol'];
@@ -6003,7 +6134,18 @@ body{
       if (mode === 'notice' || mode === 'proxy') return Promise.resolve(docImages(DOC_DEF[mode].blocks(), false, A4));
       if (mode === 'holders') return Promise.resolve([drawHoldersImage()]);
       if (mode === 'report') return Promise.resolve([drawReportImage()]);
-      if (mode === 'annual') return new Promise(function (ok, no) { setTimeout(function () { try { ok(domSectionCanvases(ANNUAL_IDS)); } catch (e) { no(e); } }, 30); });
+      if (mode === 'annual') return new Promise(function (ok, no) {
+        setTimeout(function () {
+          try {
+            var first = domSectionCanvases(ANNUAL_IDS), M = first._map || {}, keys = ['sec-biz#0', 'sec-cmp#0', 'sec-audit#0', 'sec-off#0', 'sec-off#1', 'sec-off#2', 'sec-revenue#0', 'sec-expense#0', 'sec-items#0', 'sec-accounts#0', 'sec-resol#0'];
+            var ins = document.querySelectorAll('#tocBox input[data-i]'), changed = false;   // 차례의 쪽 번호를 실제 PDF 쪽에 맞춤 (이번 PDF에만, 직접 적은 쪽은 그대로)
+            keys.forEach(function (k, i) { var el = ins[i]; if (!el || M[k] == null || (db.toc && db.toc[i])) return; if (String(el.value) !== String(M[k])) { el.value = M[k]; changed = true; } });
+            var out = changed ? domSectionCanvases(ANNUAL_IDS) : first;
+            try { renderToc(); } catch (e) { }
+            ok(out);
+          } catch (e) { no(e); }
+        }, 30);
+      });
       if (mode === 'gongmun') {
         var d = gmDoc(), list = gmPages();
         return Promise.all((d.attach || []).map(function (a) { return a.key ? gmLoadImgs(a.key) : Promise.resolve([]); })).then(function (sets) {
