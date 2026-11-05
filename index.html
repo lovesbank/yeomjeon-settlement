@@ -712,6 +712,8 @@ body{
   #ledger .rs-m .a{ grid-column:2 / 4; color:#333; margin-bottom:26px; }
   #ledger .rs-co{ position:relative; text-align:right; font-size:25px; font-weight:900; color:#143a63; letter-spacing:3px; margin:20px 6% 30px 0; padding-right:4px; }
   #ledger .rs-co img{ position:absolute; right:-24px; top:50%; width:78px; transform:translateY(-50%); mix-blend-mode:multiply; pointer-events:none; }
+  #ledger .rs-co .rs-sa{ position:relative; display:inline-block; margin-left:.32em; }
+  #ledger .rs-co .rs-sa img{ right:auto; left:50%; transform:translate(-50%,-50%); opacity:.85; }
   #ledger .rs-note{ font-size:13px; color:#777; text-align:center; margin-bottom:6px; }
   .bk-warn{ flex-basis:100%; margin-top:6px; padding:8px 10px; border-radius:8px; background:#fff4e5; border:1px solid #f0b46b; color:#7a4300; font-size:14px; line-height:1.5; }
   .bk-warn b{ color:#b34700; }
@@ -870,8 +872,9 @@ body{
     body.pm-report #report .stage{ padding:0 !important; overflow:visible; }
     body.pm-report #report .sheetWrap{ left:0 !important; transform:none !important; margin:0 auto !important; zoom:var(--pz, .76); }   /* A4 한 장에 맞춤 */
     body.pm-annual #ledger section.lsheet, body.pm-min #ledger section.lsheet, body.pm-board #ledger section.lsheet{ display:none !important; }
-    body.pm-annual #ledger section#sec-title,body.pm-annual #ledger section#sec-cover,body.pm-annual #ledger section#sec-toc,body.pm-annual #ledger section#sec-biz,body.pm-annual #ledger section#sec-cmp,body.pm-annual #ledger section#sec-audit,body.pm-annual #ledger section#sec-off,body.pm-annual #ledger section#sec-revenue,body.pm-annual #ledger section#sec-expense,body.pm-annual #ledger section#sec-items,body.pm-annual #ledger section#sec-summary,body.pm-annual #ledger section#sec-accounts,body.pm-annual #ledger section#sec-receipt,body.pm-annual #ledger section#sec-resol{ display:block !important; }
+    body.pm-annual #ledger section#sec-title,body.pm-annual #ledger section#sec-cover,body.pm-annual #ledger section#sec-toc,body.pm-annual #ledger section#sec-biz,body.pm-annual #ledger section#sec-cmp,body.pm-annual #ledger section#sec-audit,body.pm-annual #ledger section#sec-off,body.pm-annual #ledger section#sec-revenue,body.pm-annual #ledger section#sec-expense,body.pm-annual #ledger section#sec-items,body.pm-annual #ledger section#sec-summary,body.pm-annual #ledger section#sec-accounts,body.pm-annual #ledger section#sec-resol{ display:block !important; }
     body.pm-annual #ledger section#sec-resol{ break-after:auto !important; page-break-after:auto !important; }
+    body.pm-annual #ledger section#sec-summary{ break-after:auto !important; page-break-after:auto !important; }   /* 수입·지출과 통장잔액은 한 장에 */
     body.pm-holders #report, body.pm-notice #report, body.pm-proxy #report, body.pm-gongmun #report{ display:none !important; } body.pm-holders #ledger section.lsheet, body.pm-notice #ledger section.lsheet, body.pm-proxy #ledger section.lsheet, body.pm-gongmun #ledger section.lsheet{ display:none !important; }
     body.pm-gongmun #ledger section#sec-print{ display:block !important; break-after:auto !important; page-break-after:auto !important; }
     #sec-print .gm-pg{ display:block; width:100%; max-height:270mm; object-fit:contain; margin:0 auto; break-after:page; page-break-after:always; } #sec-print .gm-pg:last-child{ break-after:auto; page-break-after:auto; }
@@ -898,6 +901,29 @@ body{
     #ledger .title-box, #ledger .sumtbl tr.head th{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     #ledger .receipt{ border:0; resize:none; }
   }
+
+  /* ══ 표·제목 색 (결산서 화면·PDF·인쇄 공통): 남색 제목 띠 + 연한 파랑 머리줄 + 줄무늬 + 합계 줄 강조 ══ */
+  #ledger .title-box, #ledger .cv-title, #ledger .off-title, #ledger .rs-title{
+    background:linear-gradient(135deg,#1f3a68 0%,#2f5d9a 100%) !important; color:#fff !important; border:0 !important;
+    border-bottom:4px solid #c9a227 !important; border-radius:8px; text-shadow:0 2px 0 rgba(0,0,0,.25) !important;
+    box-shadow:0 3px 8px rgba(31,58,104,.18); -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  #ledger .title-box *, #ledger .cv-title *, #ledger .off-title *, #ledger .rs-title *{ color:#fff !important; }
+  #ledger .cv-h, #ledger .off-sub b{ color:#1f3a68; }
+  #ledger .cv-h{ border-left:5px solid #2f5d9a; padding-left:8px; }
+  #ledger table.grid{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  #ledger table.grid th, #ledger table.grid tr.head th, #ledger table.grid thead th{
+    background:linear-gradient(#e9f0fb,#d3e0f4) !important; color:#173a6b !important; font-weight:800 !important; border-color:#8fa6c8 !important;
+  }
+  #ledger table.grid td{ border-color:#9fb1cc !important; }
+  #ledger table.grid tbody tr:nth-child(even) > td:not(.lbl):not([rowspan]){ background-color:#f6f9fe; }
+  #ledger table.grid tr.sum > td, #ledger table.grid tr.k > td, #ledger .offt tr.k > td{ background:#fff3d6 !important; font-weight:800; }
+  #ledger table.grid tr.sum > td.lbl, #ledger table.grid td.month{ color:#1f3a68; font-weight:800; }
+  #ledger table.grid td.lbl, #ledger table.grid td.month, #ledger .cv-tbl tr td:first-child{ background:#eef3fb !important; }
+  #ledger .off-note{ background:linear-gradient(#f3fbf6,#e8f6ee) !important; border-color:#3e8e5e !important; border-radius:8px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  #ledger .off-note-h{ color:#1f6b40 !important; font-weight:800; }
+  #ledger .bz-end .seal-in{ position:relative; display:inline-block; }
+  #ledger .bz-end .seal-in img{ position:absolute; left:50%; top:50%; width:2.9em; height:2.9em; transform:translate(-50%,-50%); mix-blend-mode:multiply; opacity:.9; pointer-events:none; }
   </style>
 </head>
 <body>
@@ -1300,7 +1326,6 @@ body{
         <a href="#sec-summary">수입·지출</a>
         <a href="#sec-chart">그래프</a>
         <a href="#sec-accounts">통장잔액</a>
-        <a href="#sec-receipt">영수증</a>
         <a href="#sec-notice">소집통지</a>
         <a href="#sec-proxy">위임장</a>
         <a href="#sec-board">이사회</a>
@@ -1412,7 +1437,7 @@ body{
       </section>
 
       <!-- ⑤ ● 영수증 -->
-      <section id="sec-receipt" class="lsheet">
+      <section id="sec-receipt" class="lsheet no-print" style="display:none">
         <div class="title-box">● 영수증</div>
         <textarea id="receiptText" class="receipt" rows="3" aria-label="영수증 첨부 메모"></textarea>
       </section>
@@ -4203,7 +4228,7 @@ body{
       return r;
     }
     // 영업보고서 맺음말 (영업보고서 마지막 장 맨 아래)
-    function bizEndHtml(N) { return '<div class="bz-end">위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.<br>년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일<br><b>염전마을주민발전주식회사 &nbsp; 대표이사 &nbsp; ' + esc(ceoName().split('').join(' ')) + ' &nbsp; (인)</b></div>'; }
+    function bizEndHtml(N) { return '<div class="bz-end">위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.<br>년 &nbsp;&nbsp;&nbsp; 월 &nbsp;&nbsp;&nbsp; 일<br><b>염전마을주민발전주식회사 &nbsp; 대표이사 &nbsp; ' + esc(ceoName().split('').join(' ')) + ' &nbsp; <span class="seal-in">(인)<img src="' + sealImgEl.src + '" alt=""></span></b></div>'; }   // (인) 위에 회사 직인
     function bizEndXml(N) {
       var head = paraXml('', 9, 'C') + paraXml('위와 같이 ' + (N.O ? '제' + N.O.meta.gi + '기 ' : '') + '영업 상황을 보고합니다.', 39, 'C') + paraXml('년        월        일', 39, 'C');
       var sign = '염전마을주민발전주식회사   대표이사   ' + ceoName().split('').join(' ') + '   (인)';
@@ -4332,10 +4357,10 @@ body{
       ['재무상태표', '재산 · 빚 · 자본'], ['손익계산서', '한 해 동안 번 돈과 쓴 돈'], ['이익잉여금처분계산서', '쌓인 이익과 처리'],
       ['SMP · REC 매출액', '월별 전기 판매 수입'], ['지출내역서', '월별 지출 명세'], ['항목별 연간 합계 · 수입 · 지출', '항목별 지출과 월별 수입 · 지출'],
       ['현재통장 잔액', '은행별 잔액'], ['이사회 결의서', '결산 보고서 제출 결의'],
-      ['은행거래내역서', '통장 입출금 내역 사본 (첨부)'], ['영수증', '지출 영수증 사본 (첨부)']
+      ['은행거래내역서', '통장 입출금 내역 사본 (첨부)']
     ];
     // 짐작 쪽 (표지 1쪽, 결산 앞장 2쪽, 차례 3쪽 기준, 결산 보고서를 맨 앞에 넣으면 +1). null = 첨부 서류라 직접 적는 칸
-    var TOC_GUESS = [4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 14, null, null];
+    var TOC_GUESS = [4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, null];
     // 직접 적은 쪽은 그대로, 비어 있으면 짐작값 (첨부 서류는 빈칸)
     function tocPage(i, withReport) { var T = db.toc || {}; if (+T[i]) return String(+T[i]); return TOC_GUESS[i] == null ? '' : String(TOC_GUESS[i] + (withReport ? 1 : 0)); }
     function tocPages() { return TOC_LIST.map(function (x, i) { return tocPage(i, false); }); }
@@ -4781,7 +4806,7 @@ body{
         var adr = String(m[2] || '').trim(); if (adr && !/^전라남도/.test(adr)) adr = '전라남도 영광군 ' + adr;
         h += '<div class="rs-m"><div class="r">' + esc(String(m[0] || '').replace(/\s+/g, '')) + ' :</div><div class="n">' + esc(String(m[1] || '').replace(/\s+/g, '')) + '</div><div class="s">(인)</div><div class="a">' + esc(adr) + '</div></div>';
       });
-      h += '<div class="rs-co">염 전 마 을 주 민 발 전 주 식 회 사<img src="data:image/png;base64,' + SEAL_PNG + '" alt="회사 직인"></div>' +
+      h += '<div class="rs-co">염 전 마 을 주 민 발 전 주 식 회<span class="rs-sa">사<img src="data:image/png;base64,' + SEAL_PNG + '" alt="회사 직인"></span></div>' +   // 마지막 글자 「사」 한가운데에 직인 (글자가 비쳐 보이게)
         '<div class="rs-note no-print">명단은 위 「결산 앞장」 이사명단에서 고치면 여기와 한글 파일에 같이 바뀝니다.</div>';
       box.innerHTML = h;
     }
@@ -6037,15 +6062,21 @@ body{
           groups = groups.filter(function (g) { return g.length; });
           if (!groups.length) return;
           var W = Math.ceil(sec.getBoundingClientRect().width), PH = Math.round(W * 297 / 210), PAD = 36, ROOM = PH - PAD * 2;
-          function span(g) { var t = 1e9, b = -1e9; g.forEach(function (e) { var r = e.getBoundingClientRect(); t = Math.min(t, r.top); b = Math.max(b, r.bottom); }); return { t: t, b: b, h: b - t }; }
+          function span(g) { var t = 1e9, b = -1e9; g.forEach(function (e) { [e].concat(Array.prototype.slice.call(e.querySelectorAll('img'))).forEach(function (x) { if (x !== e && !shown(x)) return; var r = x.getBoundingClientRect(); t = Math.min(t, r.top); b = Math.max(b, r.bottom); }); }); return { t: t, b: b, h: b - t }; }   // 밖으로 삐져나온 직인 그림까지
           // ② 표가 적어 쪽이 휑하면 표의 줄 높이를 늘려 한 장을 채움 (표가 있는 덩어리만, 너무 짧은 것은 다른 것과 한 장에)
           groups.forEach(function (g) {
             var h = span(g).h, trs = []; g.forEach(function (e) { Array.prototype.forEach.call(e.matches('tr') ? [e] : e.querySelectorAll('tr'), function (tr) { if (shown(tr)) trs.push(tr); }); });
             g._small = h < ROOM * 0.35;
-            if (g._small || !trs.length || h >= ROOM * 0.9) return;
+            var target = ROOM * 0.96;
+            if (id === 'sec-summary') {   // 수입·지출 표 아래에 통장잔액이 같이 들어갈 자리를 남김
+              var acc = document.getElementById('sec-accounts'), ah = 0;
+              if (acc) Array.prototype.forEach.call(acc.querySelectorAll('.title-box, table'), function (x) { if (shown(x)) ah += x.getBoundingClientRect().height + 30; });
+              target = ROOM - ah - 40;
+            }
+            if (g._small || !trs.length || h >= target * 0.94) return;
             trs.forEach(function (tr) { restore.push([tr, tr.style.height]); });
             var base = trs.map(function (tr) { return tr.getBoundingClientRect().height; }), lo = 0, hi = 140;
-            for (var it = 0; it < 12; it++) { var mid = (lo + hi) / 2; trs.forEach(function (tr, i) { tr.style.height = (base[i] + mid) + 'px'; }); if (span(g).h <= ROOM * 0.96) lo = mid; else hi = mid; }
+            for (var it = 0; it < 12; it++) { var mid = (lo + hi) / 2; trs.forEach(function (tr, i) { tr.style.height = (base[i] + mid) + 'px'; }); if (span(g).h <= target) lo = mid; else hi = mid; }
             trs.forEach(function (tr, i) { tr.style.height = (base[i] + lo) + 'px'; });
           });
           // ③ 화면 그대로 그림으로 (배경·테두리·그림 → 입력칸 값 → 글자)
@@ -6058,12 +6089,22 @@ body{
             var r = el.getBoundingClientRect(); if (!r.width || !r.height) return;
             var x = r.left - R0.left, y = r.top - R0.top;
             if (col(cs.backgroundColor)) { g.fillStyle = cs.backgroundColor; g.fillRect(x, y, r.width, r.height); }
+            if (/linear-gradient/.test(cs.backgroundImage)) {   // 제목 띠·머리줄의 그라데이션도 그대로
+              var cols = cs.backgroundImage.match(/rgba?\([^)]*\)/g) || [], bi = cs.backgroundImage, gd;
+              if (cols.length >= 2) {
+                if (/deg/.test(bi) && /135deg/.test(bi)) gd = g.createLinearGradient(x, y, x + r.width, y + r.height);
+                else if (/90deg|to right/.test(bi)) gd = g.createLinearGradient(x, y, x + r.width, y);
+                else gd = g.createLinearGradient(x, y, x, y + r.height);
+                cols.forEach(function (cc, ci) { gd.addColorStop(ci / (cols.length - 1), cc); });
+                g.fillStyle = gd; g.fillRect(x, y, r.width, r.height);
+              }
+            }
             [['Top'], ['Bottom'], ['Left'], ['Right']].forEach(function (b) {
               var s = b[0], bw = parseFloat(cs['border' + s + 'Width']) || 0; if (!bw || cs['border' + s + 'Style'] === 'none' || !col(cs['border' + s + 'Color'])) return;
               g.fillStyle = cs['border' + s + 'Color'];
               if (s === 'Top') g.fillRect(x, y, r.width, bw); else if (s === 'Bottom') g.fillRect(x, y + r.height - bw, r.width, bw); else if (s === 'Left') g.fillRect(x, y, bw, r.height); else g.fillRect(x + r.width - bw, y, bw, r.height);
             });
-            if (el.tagName === 'IMG' && el.complete && el.naturalWidth) { try { g.drawImage(el, x, y, r.width, r.height); } catch (e) { } }
+            if (el.tagName === 'IMG' && el.complete && el.naturalWidth) { try { var mb = cs.mixBlendMode === 'multiply'; if (mb) { g.save(); g.globalCompositeOperation = 'multiply'; g.globalAlpha = parseFloat(cs.opacity) || 1; } g.drawImage(el, x, y, r.width, r.height); if (mb) g.restore(); } catch (e) { } }   // 직인은 글자가 비치게
             if (el.tagName === 'TR') { var nx = el.closest('table'), last = nx && nx.rows[nx.rows.length - 1] === el; if (!last) breaks.push(y + r.height); }
             if (el.classList.contains('off-note') || el.tagName === 'TEXTAREA' || /^(P|LI)$/.test(el.tagName)) noBreak.push([y - 1, y + r.height + 1]);   // 주민 설명·문단은 자르지 않음
             if (/(^|\s)(cv-h|off-title|title-box|cv-title|rs-title|off-sub|off-co|bz-sub)(\s|$)/.test(el.className)) noBreak.push([y - 1, y + r.height + 40]);   // 제목 바로 뒤에서 끊지 않음
@@ -6086,9 +6127,10 @@ body{
             var pe = node.parentElement; if (!pe || hidden(pe) || /^(OPTION|SELECT|TEXTAREA|SCRIPT|STYLE)$/.test(pe.tagName)) continue;
             var cs = getComputedStyle(pe); if (cs.display === 'none') continue;
             g.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; g.fillStyle = cs.color;
-            var run = '', rx = 0, ry = 0, rtop = null;
+            var run = '', rx = 0, ry = 0, rtop = null, perChar = (parseFloat(cs.letterSpacing) || 0) > 0.5;   // 글자 사이를 벌린 줄은 한 글자씩 제자리에
             for (var i = 0; i < t.length; i++) {
               rg.setStart(node, i); rg.setEnd(node, i + 1); var cr = rg.getClientRects()[0];
+              if (perChar) { if (cr && cr.width && t[i].trim()) g.fillText(t[i], cr.left - R0.left, (cr.top + cr.bottom) / 2 - R0.top); continue; }
               if (!cr || !cr.width) { if (run && /\s/.test(t[i])) run += ' '; continue; }
               if (rtop === null || Math.abs(cr.top - rtop) > 2) { if (run.trim()) g.fillText(run, rx, ry); run = ''; rx = cr.left - R0.left; ry = (cr.top + cr.bottom) / 2 - R0.top; rtop = cr.top; }
               run += t[i];
@@ -6107,6 +6149,7 @@ body{
               var og0 = newPage(); put(og0, top, h, PAD, 1); pend = { g: og0, used: h }; return;
             }
             pend = null;
+            if (h <= ROOM && id === 'sec-summary') { var ogS = newPage(); put(ogS, top, h, PAD, 1); pend = { g: ogS, used: h }; return; }   // 다음 통장잔액이 이 장 아래로
             if (gr.length === 1 && gr[0].tagName === 'IMG') { var iw = gr[0].getBoundingClientRect().width, isc = Math.min(ROOM / h, W / Math.max(1, iw)); put(newPage(), top, h, PAD + (ROOM - h * isc) / 2, isc); return; }   // 표지 그림: 한 장 가득
             if (h <= ROOM) { put(newPage(), top, h, PAD, 1); return; }
             if (h <= ROOM * 1.4) { put(newPage(), top, h, PAD, ROOM / h); return; }   // 조금 넘치면 살짝 줄여 한 장에
@@ -6125,7 +6168,7 @@ body{
       }
       return pages;
     }
-    var ANNUAL_IDS = ['sec-title', 'sec-cover', 'sec-toc', 'sec-biz', 'sec-cmp', 'sec-audit', 'sec-off', 'sec-revenue', 'sec-expense', 'sec-items', 'sec-summary', 'sec-accounts', 'sec-receipt', 'sec-resol'];
+    var ANNUAL_IDS = ['sec-title', 'sec-cover', 'sec-toc', 'sec-biz', 'sec-cmp', 'sec-audit', 'sec-off', 'sec-revenue', 'sec-expense', 'sec-items', 'sec-summary', 'sec-accounts', 'sec-resol'];   // 영수증은 뺌
     // PDF 쪽 그림 만들기 (A4 비율)
     function pdfCanvases(mode) {
       var A4 = 297 / 210;
@@ -7089,7 +7132,7 @@ body{
       var bankTitle = null;
       ps.forEach(function (p) { if (!bankTitle && /현재통장잔액/.test(textOf(p)) && !p.getElementsByTagNameNS(HP, 'tbl').length) bankTitle = p; });
       if (!bankTitle) ps.forEach(function (p) { if (!bankTitle && /현재통장잔액/.test(textOf(p))) bankTitle = p; });
-      if (bankTitle) bankTitle.setAttribute('pageBreak', '1');
+      if (bankTitle) bankTitle.setAttribute('pageBreak', '0');   // 수입·지출 표와 현재통장 잔액은 한 장에
       // ② 「● 영수증 …」 줄 바로 아래에 이사회 결의서
       var after = null;
       ps.forEach(function (p) { if (/영수증/.test(textOf(p)) && !p.getElementsByTagNameNS(HP, 'tbl').length) after = p; });
@@ -7098,8 +7141,7 @@ body{
       // 마지막 이사 줄부터 회사 이름·직인까지는 한 덩어리로 (회사 이름과 직인만 다음 장으로 넘어가지 않게)
       var keep = addKeepParaPrs(files);
       function kp(xml, al) { return keep ? xml.replace(/paraPrIDRef="\d+"/, 'paraPrIDRef="' + KEEP_PP[al] + '"') : xml; }
-      out += paraXml('', 9, 'C') + paraXml('', 9, 'C');
-      out += titleBlock('이 사 회   결 의 서', 0);
+      out += titleBlock('이 사 회   결 의 서', 1);   // 영수증은 빼고, 결의서는 새 장에서
       out += paraXml('', 9, 'C');
       out += paraXml('이사회의 의결로써 이와 같이 (' + perDots(Y) + ')', 40, 'C');
       out += paraXml('', B13, 'C') + paraXml('결산 보고서를 제출합니다.', 40, 'C') + paraXml('', B13, 'C') + paraXml('', B13, 'C');
@@ -7125,6 +7167,7 @@ body{
       if (frag.getElementsByTagName('parsererror').length) throw new Error('이사회 결의서 변환 오류');
       var ref = after.nextSibling;
       Array.prototype.slice.call(frag.documentElement.childNodes).forEach(function (n) { sec.insertBefore(doc.importNode(n, true), ref); });
+      sec.removeChild(after);   // 「● 영수증 …」 줄은 뺌
       // 직인 그림 파일을 한글 파일 안에 넣고 목록(content.hpf)에 등록 (header.xml은 그대로)
       ensureSeal(files);
     }
