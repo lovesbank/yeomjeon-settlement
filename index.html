@@ -851,6 +851,10 @@ body{
 
   /* PDF 저장 모드 (버튼이 body에 pm-… 를 붙이고 인쇄 창을 엶) */
   #sec-print{ display:none; }
+  /* PDF 그림 만들 때: 화면 축소 없이 1000px 그대로, 버튼·안내는 빼고 */
+  .pdf-render #ledger main{ transform:none !important; }
+  .pdf-render #ledger .lsheet{ box-shadow:none !important; }
+  .pdf-render input::placeholder, .pdf-render textarea::placeholder{ color:transparent !important; }
   @media print{
     body.pm-annual #report, body.pm-min #report, body.pm-board #report{ display:none !important; }
     body.pm-report #ledger{ display:none !important; }
@@ -2953,7 +2957,11 @@ body{
       save();
       renderAll();
     });
-    $('btnPrint').addEventListener('click', function () { window.print(); });
+    $('btnPrint').addEventListener('click', function () {   // 앱(카톡 등) 안에서는 인쇄가 안 되므로 「표지~결의서」 PDF를 바로 만들어 줌
+      var ua = navigator.userAgent || '';
+      if (/KAKAOTALK|NAVER\(inapp|; Line\/|BAND\/|Instagram|FBAN|FBAV|DaumApps/i.test(ua) || typeof window.print !== 'function') { printPdf('annual', this); return; }
+      window.print();
+    });
     $('btnExport').addEventListener('click', function () {
       var t = new Date();
       var a = document.createElement('a');
@@ -5005,8 +5013,8 @@ body{
       c._breaks = breaks;
       return c;
     }
-    function docImages(blocks, fill) {   // 13pt 고정, 한 화면(1 : 1.95)을 넘으면 줄 사이에서 나눔, 여러 장이면 ( n / N )
-      var W = 1080, TARGET = Math.round(W * 1.95), FOOT = 70, TOP = 30, PX = Math.round(1080 / 187 * 13 * 0.3528), parts = [];
+    function docImages(blocks, fill, ratio) {   // 13pt 고정, 한 화면(1 : 1.95, PDF는 A4 1 : 1.414)을 넘으면 줄 사이에서 나눔, 여러 장이면 ( n / N )
+      var W = 1080, TARGET = Math.round(W * (ratio || 1.95)), FOOT = 70, TOP = 30, PX = Math.round(1080 / 187 * 13 * 0.3528), parts = [];
       if (fill) {   // 위임장·소집통지서: 장마다 글자를 키워 휴대폰 한 화면(1 : 1.95)을 꽉 채움 → 위는 카메라 구멍 바로 아래부터
         return docPages(blocks).map(function (pg) {
           var lo = PX, hi = PX * 2.4, best = drawDocAt(pg, PX);
@@ -5866,7 +5874,159 @@ body{
       return bl;
     }
     // PDF 저장: 해당 부분만 보이게 표시를 붙이고 인쇄 창을 엶 (파일 이름 = 문서 제목)
+    // 카카오톡·네이버·밴드 등 앱 안의 브라우저는 인쇄(PDF 저장) 기능이 없어 버튼을 눌러도 아무 일도 안 일어남 → 안내하고 사파리/크롬으로 열기
+    function inAppNoPrint() {
+      var ua = navigator.userAgent || '', kakao = /KAKAOTALK/i.test(ua);
+      if (!(kakao || /NAVER\(inapp|; Line\/|BAND\/|Instagram|FBAN|FBAV|DaumApps|everytimeApp/i.test(ua)) && typeof window.print === 'function') return false;
+      var msg = '카카오톡 같은 앱 안의 화면에서는 인쇄·PDF 저장이 되지 않습니다.\n\n' +
+        '① 먼저 「백업 저장」을 눌러 장부를 파일로 저장하세요.\n② 사파리(갤럭시는 크롬)로 이 사이트를 열고\n③ 처음 한 번만 「백업 불러오기」로 그 파일을 불러오면 됩니다.\n\n' +
+        '(앱 안의 화면과 사파리는 저장 공간이 따로라서, 불러오기 전에는 사파리에 장부가 비어 있습니다.)\n\n지금 사파리(크롬)로 열까요?';
+      if (window.confirm(msg)) {
+        if (kakao) location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href);
+        else window.open(location.href, '_blank');
+      }
+      return true;
+    }
+    /* ── PDF 파일을 바로 만들어 공유(저장) 창을 엶: 인쇄 창 없이, 카카오톡 안에서도 됨 ──
+       쪽마다 그림(JPEG)을 A4 쪽에 맞춰 넣은 PDF를 직접 만듦 (외부 프로그램 없음) */
+    function canvasJpeg(c) { var b = atob(c.toDataURL('image/jpeg', 0.9).split(',')[1]), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+    function makePdf(canvases) {
+      var enc = new TextEncoder(), parts = [], len = 0, offs = [], PW = 595.28, PH = 841.89;
+      function add(x) { var u = typeof x === 'string' ? enc.encode(x) : x; parts.push(u); len += u.length; }
+      function obj(n, body) { offs[n] = len; add(n + ' 0 obj\n'); body(); add('\nendobj\n'); }
+      var N = canvases.length, kids = [];
+      for (var i = 0; i < N; i++) kids.push((3 + i * 3) + ' 0 R');
+      add('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n');
+      obj(1, function () { add('<< /Type /Catalog /Pages 2 0 R >>'); });
+      obj(2, function () { add('<< /Type /Pages /Kids [' + kids.join(' ') + '] /Count ' + N + ' >>'); });
+      canvases.forEach(function (c, i) {
+        var pn = 3 + i * 3, cn = pn + 1, im = pn + 2, jpg = canvasJpeg(c);
+        var sc = Math.min(PW / c.width, PH / c.height), w = c.width * sc, h = c.height * sc, x = (PW - w) / 2, y = (PH - h) / 2;   // 쪽 가운데에 비율 그대로
+        var cs = 'q ' + w.toFixed(2) + ' 0 0 ' + h.toFixed(2) + ' ' + x.toFixed(2) + ' ' + y.toFixed(2) + ' cm /Im0 Do Q';
+        obj(pn, function () { add('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + PW + ' ' + PH + '] /Resources << /XObject << /Im0 ' + im + ' 0 R >> >> /Contents ' + cn + ' 0 R >>'); });
+        obj(cn, function () { add('<< /Length ' + cs.length + ' >>\nstream\n' + cs + '\nendstream'); });
+        obj(im, function () { add('<< /Type /XObject /Subtype /Image /Width ' + c.width + ' /Height ' + c.height + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpg.length + ' >>\nstream\n'); add(jpg); add('\nendstream'); });
+      });
+      var xref = len, total = 3 + N * 3, xr = 'xref\n0 ' + total + '\n0000000000 65535 f \n';
+      for (var n = 1; n < total; n++) xr += String(offs[n]).padStart(10, '0') + ' 00000 n \n';
+      add(xr + 'trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
+      return new Blob(parts, { type: 'application/pdf' });
+    }
+    function sharePdf(canvases, name, msg) {
+      var blob = makePdf(canvases), file = null;
+      try { file = new File([blob], name, { type: 'application/pdf' }); } catch (e) { }
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: name }).then(function () { if (msg) msg.textContent = '✔ ' + name + ' — 공유 창에서 「파일에 저장」이나 카톡으로 보내면 됩니다.'; })
+          .catch(function (e) { if (msg) msg.textContent = e && e.name === 'AbortError' ? '취소했습니다.' : '⚠ 공유하지 못했습니다: ' + (e && e.message); });
+      } else {
+        var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+        if (msg) msg.textContent = '✔ ' + name + ' 저장했습니다.';
+      }
+    }
+    /* ── 화면에 보이는 문서(표지~결의서)를 그대로 그림으로 옮김: 배경·테두리·글자·입력칸 값·그림을 캔버스에 그리고 A4 쪽으로 나눔 ── */
+    function domSectionCanvases(ids) {
+      var root = document.documentElement, S = 2, pages = [];
+      root.classList.add('pdf-render');
+      try {
+        ids.forEach(function (id) {
+          var sec = document.getElementById(id); if (!sec || sec.offsetParent === null && getComputedStyle(sec).display === 'none') return;
+          var R0 = sec.getBoundingClientRect(), W = Math.ceil(R0.width), H = Math.ceil(R0.height); if (W < 50 || H < 20) return;
+          var c = document.createElement('canvas'); c.width = W * S; c.height = H * S;
+          var g = c.getContext('2d'); g.scale(S, S); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.textBaseline = 'middle';
+          var breaks = [];
+          function hidden(el) { return el.closest('.no-print:not(section), button, .cv-del, .cv-add, script, style') || getComputedStyle(el).visibility === 'hidden'; }
+          function col(v) { return v && v !== 'transparent' && !/rgba\(\d+, \d+, \d+, 0\)/.test(v); }
+          var els = sec.querySelectorAll('*');
+          // ① 배경·테두리·그림
+          Array.prototype.forEach.call(els, function (el) {
+            if (hidden(el)) return; var cs = getComputedStyle(el); if (cs.display === 'none') return;
+            var r = el.getBoundingClientRect(); if (!r.width || !r.height) return;
+            var x = r.left - R0.left, y = r.top - R0.top;
+            if (col(cs.backgroundColor)) { g.fillStyle = cs.backgroundColor; g.fillRect(x, y, r.width, r.height); }
+            [['Top', x, y, r.width, 0], ['Bottom', x, y + r.height, r.width, 0], ['Left', x, y, 0, r.height], ['Right', x + r.width, y, 0, r.height]].forEach(function (b) {
+              var bw = parseFloat(cs['border' + b[0] + 'Width']) || 0; if (!bw || cs['border' + b[0] + 'Style'] === 'none' || !col(cs['border' + b[0] + 'Color'])) return;
+              g.fillStyle = cs['border' + b[0] + 'Color'];
+              if (b[0] === 'Top') g.fillRect(b[1], b[2], b[3], bw); else if (b[0] === 'Bottom') g.fillRect(b[1], b[2] - bw, b[3], bw); else if (b[0] === 'Left') g.fillRect(b[1], b[2], bw, b[4]); else g.fillRect(b[1] - bw, b[2], bw, b[4]);
+            });
+            if (el.tagName === 'IMG' && el.complete && el.naturalWidth) { try { g.drawImage(el, x, y, r.width, r.height); } catch (e) { } }
+            if (el.tagName === 'TR' || /^(P|H\d|LI|TABLE|DIV)$/.test(el.tagName) && cs.display === 'block') breaks.push(r.bottom - R0.top);
+          });
+          // ② 입력칸에 적힌 값
+          Array.prototype.forEach.call(sec.querySelectorAll('input, textarea, select'), function (el) {
+            if (hidden(el) || el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'hidden') return;
+            var cs = getComputedStyle(el); if (cs.display === 'none') return;
+            var v = el.tagName === 'SELECT' ? (el.options[el.selectedIndex] ? el.options[el.selectedIndex].text : '') : el.value; if (!v) return;
+            var r = el.getBoundingClientRect(), x = r.left - R0.left, y = r.top - R0.top, pl = parseFloat(cs.paddingLeft) || 2, pr = parseFloat(cs.paddingRight) || 2;
+            g.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; g.fillStyle = cs.color;
+            var lines = [], maxW = r.width - pl - pr;
+            String(v).split('\n').forEach(function (para) { var line = ''; para.split('').forEach(function (ch) { if (el.tagName === 'TEXTAREA' && g.measureText(line + ch).width > maxW && line) { lines.push(line); line = ch; } else line += ch; }); lines.push(line); });
+            var lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4, al = cs.textAlign, y0 = el.tagName === 'TEXTAREA' ? y + (parseFloat(cs.paddingTop) || 2) + lh / 2 : y + r.height / 2;
+            lines.forEach(function (t, i) { g.textAlign = al === 'center' ? 'center' : (al === 'right' || al === 'end') ? 'right' : 'left'; g.fillText(t, g.textAlign === 'center' ? x + r.width / 2 : g.textAlign === 'right' ? x + r.width - pr : x + pl, y0 + i * lh); });
+            g.textAlign = 'left';
+          });
+          // ③ 글자: 글자 하나하나의 실제 자리를 재서 같은 줄끼리 이어 그림
+          var tw = document.createTreeWalker(sec, NodeFilter.SHOW_TEXT, null), node, rg = document.createRange();
+          while ((node = tw.nextNode())) {
+            var t = node.nodeValue; if (!t || !t.trim()) continue;
+            var pe = node.parentElement; if (!pe || hidden(pe) || /^(OPTION|SELECT|TEXTAREA|SCRIPT|STYLE)$/.test(pe.tagName)) continue;
+            var cs = getComputedStyle(pe); if (cs.display === 'none') continue;
+            g.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; g.fillStyle = cs.color;
+            var run = '', rx = 0, ry = 0, rtop = null;
+            for (var i = 0; i < t.length; i++) {
+              rg.setStart(node, i); rg.setEnd(node, i + 1); var cr = rg.getClientRects()[0];
+              if (!cr || !cr.width) { if (run && /\s/.test(t[i])) run += ' '; continue; }
+              if (rtop === null || Math.abs(cr.top - rtop) > 2) { if (run.trim()) g.fillText(run, rx, ry); run = ''; rx = cr.left - R0.left; ry = (cr.top + cr.bottom) / 2 - R0.top; rtop = cr.top; }
+              run += t[i];
+            }
+            if (run.trim()) g.fillText(run, rx, ry);
+          }
+          // ④ A4 쪽으로 나누기 (줄·표 행 경계에서)
+          var PH = Math.round(W * 297 / 210), PAD = 28, room = PH - PAD * 2, top = 0;
+          breaks = breaks.filter(function (b) { return b > 0 && b <= H; }).sort(function (a, b) { return a - b; });
+          while (top < H - 5) {
+            var end = H;
+            if (H - top > room) { end = top + room; var best = 0; breaks.forEach(function (b) { if (b > top + room * 0.4 && b <= top + room) best = b; }); if (best) end = best; }
+            var o = document.createElement('canvas'); o.width = W * S; o.height = PH * S; var og = o.getContext('2d'); og.fillStyle = '#fff'; og.fillRect(0, 0, o.width, o.height);
+            og.drawImage(c, 0, top * S, W * S, (end - top) * S, 0, PAD * S, W * S, (end - top) * S); pages.push(o); top = end;
+          }
+        });
+      } finally { root.classList.remove('pdf-render'); }
+      return pages;
+    }
+    var ANNUAL_IDS = ['sec-title', 'sec-cover', 'sec-toc', 'sec-biz', 'sec-cmp', 'sec-audit', 'sec-off', 'sec-revenue', 'sec-expense', 'sec-items', 'sec-summary', 'sec-accounts', 'sec-receipt', 'sec-resol'];
+    // PDF 쪽 그림 만들기 (A4 비율)
+    function pdfCanvases(mode) {
+      var A4 = 297 / 210;
+      if (mode === 'min') return Promise.resolve(docImages(minutesBlocks(), false, A4));
+      if (mode === 'board') return Promise.resolve(docImages(boardBlocks(), false, A4));
+      if (mode === 'notice' || mode === 'proxy') return Promise.resolve(docImages(DOC_DEF[mode].blocks(), false, A4));
+      if (mode === 'holders') return Promise.resolve([drawHoldersImage()]);
+      if (mode === 'report') return Promise.resolve([drawReportImage()]);
+      if (mode === 'annual') return new Promise(function (ok, no) { setTimeout(function () { try { ok(domSectionCanvases(ANNUAL_IDS)); } catch (e) { no(e); } }, 30); });
+      if (mode === 'gongmun') {
+        var d = gmDoc(), list = gmPages();
+        return Promise.all((d.attach || []).map(function (a) { return a.key ? gmLoadImgs(a.key) : Promise.resolve([]); })).then(function (sets) {
+          sets.forEach(function (ims) { ims.forEach(function (im) { var c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0); list.push(c); }); });
+          return list;
+        });
+      }
+      return null;
+    }
     function printPdf(mode, btn) {
+      var direct = pdfCanvases(mode);
+      if (direct) {   // 인쇄 창 없이 PDF 파일을 바로 만들어 저장(공유) 창
+        var dm = btn && btn.parentNode && btn.parentNode.querySelector('.bz-hint, .eb-msg, .pdf-msg'); if (!dm) dm = $('kkMsg');
+        if (dm) dm.textContent = 'PDF를 만드는 중…';
+        direct.then(function (cs) {
+          var nm = { annual: function () { return year + '년_정기주주총회_결산서'; }, report: function () { var R2 = reportYM(); return R2.y + '년_' + R2.m + '월_결산보고서'; }, min: function () { return P_minName().replace(/\.png$/, ''); },
+            board: function () { var B = boardData(); return B.key.slice(0, 4) + '년_' + (+B.key.slice(5, 7)) + '월_이사회_회의록'; }, holders: function () { return '주주명부_' + year; },
+            notice: function () { return DOC_DEF.notice.name(); }, proxy: function () { return DOC_DEF.proxy.name(); }, gongmun: function () { return gmName(); } }[mode]();
+          sharePdf(cs, nm + '.pdf', dm);
+        }).catch(function (e) { if (dm) dm.textContent = '⚠ PDF를 만들지 못했습니다: ' + (e && e.message); });
+        return;
+      }
+      if (inAppNoPrint()) return;
       var R2 = reportYM(), O = fsOfficial(year), gi = O ? O.meta.gi : year - 2018, title = {
         report: R2.y + '년_' + R2.m + '월_결산보고서',
         annual: year + '년_정기주주총회_결산서',
