@@ -866,6 +866,10 @@ body{
   .px-rel{ display:block; margin-top:8px; font-size:15px; } .px-rel input{ width:100%; max-width:420px; box-sizing:border-box; margin-top:4px; padding:10px; border:1px solid #9fb0c9; border-radius:8px; font-size:16px; }
   .px-none{ margin:10px 0; padding:12px 14px; border:2px solid #e0a030; border-radius:10px; background:#fff8ec; color:#7a4a00; font-size:15px; line-height:1.6; }
   @media print{ .px-pick, .px-none{ display:none !important; } }
+  .sk-bar{ display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 10px; padding:10px 12px calc(10px) ; padding-top:calc(10px + env(safe-area-inset-top)); background:#1d2b5c; }
+  #btnSkillSave{ padding:11px 16px; border:0; border-radius:12px; background:linear-gradient(135deg,#ffd76a,#f2b632); color:#1d2b5c; font-size:16px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,.3); }
+  #btnSkillSave small{ font-weight:600; font-size:13px; }
+  .sk-msg{ font-size:13px; color:#c8f7c5; }
   #docEd{ position:fixed; inset:0; z-index:9990; background:#eef1f6; display:flex; flex-direction:column; font-family:inherit; color:#111; }
   #docEd button{ font-family:inherit; cursor:pointer; }
   #docEd .ed-top{ display:flex; align-items:center; gap:8px; padding:calc(10px + env(safe-area-inset-top)) 12px 10px; background:linear-gradient(135deg,#1f3a68,#2c5a9e); color:#fff; font-size:16px; }
@@ -900,7 +904,7 @@ body{
   #docEd .ed-go{ flex:1; padding:13px 4px; border:0; border-radius:12px; background:#1f3a68; color:#fff; font-size:16px; font-weight:800; }
   #docEd .ed-pdf{ background:#2e7d32; }
   #docEd .ed-r{ padding:13px 10px; border:1px solid #bbb; border-radius:12px; background:#fff; font-size:14px; }
-  @media print{ #docEd{ display:none !important; } }
+  @media print{ #docEd, .sk-bar{ display:none !important; } }
   #docEd .ed-undo{ padding:6px 12px; border:0; border-radius:8px; background:#c62828; color:#fff; font-size:15px; font-weight:800; white-space:nowrap; }
   #docEd .ed-undo:disabled{ background:#d9d9d9; color:#888; }
   #docEd .ed-edbar{ position:sticky; top:-12px; z-index:2; display:flex; gap:6px; margin:-12px -12px 10px; padding:8px 12px; background:#e9eef7; border-bottom:1px solid #cfd8e6; }
@@ -1009,6 +1013,8 @@ body{
   </style>
 </head>
 <body>
+  <!-- 맨 위: 이사회 회의록 스킬에 올릴 결산 자료(백업과 같은 파일) 저장 · 보내기 -->
+  <div class="sk-bar no-print"><button type="button" id="btnSkillSave">📤 결산 자료 저장 · 보내기 <small>(이사회 회의록 스킬용)</small></button><span id="skMsg" class="sk-msg" aria-live="polite"></span></div>
   <!-- =========================================================
        ① 월 결산 보고서
        ========================================================= -->
@@ -3079,9 +3085,7 @@ body{
       if (/KAKAOTALK|NAVER\(inapp|; Line\/|BAND\/|Instagram|FBAN|FBAV|DaumApps/i.test(ua) || typeof window.print !== 'function') { printPdf('annual', this); return; }
       window.print();
     });
-    $('btnExport').addEventListener('click', function () {
-      var t = new Date();
-      var a = document.createElement('a');
+    function backupJson() {
       // 백업에 「항목별 연간 합계」 결과도 함께 넣음 (빈 줄 3칸은 장부 자료 items 안에 이미 저장됨)
       var out = JSON.parse(JSON.stringify(db)), keep = year, rep = {};
       try {
@@ -3093,12 +3097,47 @@ body{
         });
       } finally { year = keep; }
       out.itemsReport = rep;
-      a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }));
+      return JSON.stringify(out, null, 2);
+    }
+    $('btnExport').addEventListener('click', function () {
+      var t = new Date();
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([backupJson()], { type: 'application/json' }));
       a.download = '수입지출_백업_' + t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + '.json';
       document.body.appendChild(a);
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
       markBackup();
+    });
+    // 맨 위 「결산 자료 저장 · 보내기」: 백업과 같은 파일(.json)을 아이폰 공유 창으로 → Claude 앱으로 보내기 또는 「파일에 저장」
+    $('btnSkillSave').addEventListener('click', function () {
+      var t = new Date(), name = '결산서_자료_' + t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + '.json', msg = $('skMsg');
+      var txt; try { txt = backupJson(); } catch (e) { msg.textContent = '⚠ 자료를 만들지 못했습니다: ' + e.message; return; }
+      var blob = new Blob([txt], { type: 'application/json' }), file = null;
+      function mk(type) { try { return new File([txt], name, { type: type }); } catch (e) { return null; } }
+      function ok(f) { try { return !!(f && navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; } }
+      file = mk('application/json'); if (!ok(file)) { file = mk('text/plain'); if (!ok(file)) file = null; }
+      markBackup();
+      function sheet() {
+        var old = document.getElementById('pdfSheet'); if (old) old.remove();
+        var url = URL.createObjectURL(blob), d = document.createElement('div'); d.id = 'pdfSheet';
+        d.innerHTML = '<div class="ps-box"><div class="ps-t">📤 결산 자료가 준비됐습니다</div><div class="ps-n">' + esc(name) + '</div>' +
+          (file ? '<button type="button" class="ps-go" id="psShare">📤 저장 · 보내기</button>' : '') +
+          '<a class="ps-go ps-open" href="' + url + '" download="' + esc(name) + '" target="_blank" rel="noopener">📂 파일 열기 · 내려받기</a>' +
+          '<button type="button" class="ps-x" id="psClose">닫기</button><div class="ps-h">이사회 회의록을 쓸 때 이 파일을 Claude 대화창에 올리면 전월 잔액·수입·예상 지출이 자동으로 들어갑니다.</div></div>';
+        document.body.appendChild(d);
+        d.addEventListener('click', function (e) {
+          if (e.target.id === 'psShare') navigator.share({ files: [file], title: name }).then(function () { msg.textContent = '✔ 보냈습니다(저장했습니다).'; d.remove(); }).catch(function (er) { if (!(er && er.name === 'AbortError')) msg.textContent = '⚠ 공유하지 못했습니다: ' + (er && er.message); });
+          if (e.target.id === 'psClose' || e.target === d) { d.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 60000); }
+        });
+        msg.textContent = '✔ 자료가 준비됐습니다.';
+      }
+      if (file) {   // 공유 창을 바로 열어 봄 (Claude 앱 · 파일에 저장 · 카톡)
+        try {
+          navigator.share({ files: [file], title: name }).then(function () { msg.textContent = '✔ ' + name + ' — 보냈습니다(저장했습니다).'; })
+            .catch(function (e) { if (e && e.name === 'AbortError') msg.textContent = '취소했습니다.'; else sheet(); });
+        } catch (e) { sheet(); }
+      } else sheet();
     });
     $('fileImport').addEventListener('change', function () {
       var f = this.files && this.files[0];
