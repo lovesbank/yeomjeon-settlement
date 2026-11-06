@@ -870,6 +870,9 @@ body{
   #btnSkillSave{ padding:11px 16px; border:0; border-radius:12px; background:linear-gradient(135deg,#ffd76a,#f2b632); color:#1d2b5c; font-size:16px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,.3); }
   #btnSkillSave small{ font-weight:600; font-size:13px; }
   .sk-msg{ font-size:13px; color:#c8f7c5; }
+  .cl-btn{ background:linear-gradient(135deg,#6d4aff,#4b2fd1) !important; color:#fff !important; border-color:#4b2fd1 !important; font-weight:800; }
+  .cl-btn small{ font-weight:600; opacity:.9; }
+  #pdfSheet .ps-go + .ps-go{ margin-top:8px; }
   #docEd{ position:fixed; inset:0; z-index:9990; background:#eef1f6; display:flex; flex-direction:column; font-family:inherit; color:#111; }
   #docEd button{ font-family:inherit; cursor:pointer; }
   #docEd .ed-top{ display:flex; align-items:center; gap:8px; padding:calc(10px + env(safe-area-inset-top)) 12px 10px; background:linear-gradient(135deg,#1f3a68,#2c5a9e); color:#fff; font-size:16px; }
@@ -1358,6 +1361,7 @@ body{
     <div class="eb-row">
       <button type="button" class="eb-btn" id="kkSave" style="background:#f2c200;color:#3a1d1d">📷 사진으로 저장 / 카톡 보내기</button>
       <button type="button" class="eb-btn" data-pdf="report">📄 결산서 PDF로 저장</button>
+      <button type="button" class="eb-btn cl-btn" data-claude="report">🤖 Claude에게 보내기 <small>(PDF + 결산 자료)</small></button>
     </div>
     <div class="eb-msg" id="kkMsg" aria-live="polite"></div>
   </section>
@@ -3108,6 +3112,65 @@ body{
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
       markBackup();
+    });
+    // 「🤖 Claude에게 보내기」: 그 서류 PDF + 결산 자료(.json, 백업과 같은 내용)를 한 번에 공유 창으로 → Claude 앱 선택
+    function edBlocksFor(id) {   // 미리보기 편집기에서 고친 내용이 있고 원래 문서가 그대로면 그 내용으로
+      try {
+        var S = db.docEdit && db.docEdit[id], D = DOC_DEF[id]; if (!S || !D) return null;
+        return S.sig === edHash(JSON.stringify(D.blocks(), edStrip)) ? S : null;
+      } catch (e) { return null; }
+    }
+    function claudeCanvases(mode) {
+      if (mode === 'board') {
+        var S = edBlocksFor('board');
+        if (S) { var a = DOC_FS, l = DOC_LS; DOC_FS = S.fs || 1; DOC_LS = S.ls || 0; try { return Promise.resolve(docImages(JSON.parse(JSON.stringify(S.blocks)), false, 297 / 210)); } finally { DOC_FS = a; DOC_LS = l; } }
+      }
+      return pdfCanvases(mode);
+    }
+    function claudeName(mode) {
+      if (mode === 'annual') return year + '년_정기주주총회_결산서';
+      if (mode === 'report') { var R2 = reportYM(); return R2.y + '년_' + R2.m + '월_결산보고서'; }
+      var B = boardData(); return B.key.slice(0, 4) + '년_' + (+B.key.slice(5, 7)) + '월_이사회_회의록';
+    }
+    function sendToClaude(mode, btn) {
+      var msg = (btn && btn.parentNode && btn.parentNode.querySelector('.eb-msg, .bz-hint, .pdf-msg')) || (btn && btn.closest('section') && btn.closest('section').querySelector('.eb-msg, .bz-hint')) || $('skMsg');
+      function say(t) { if (msg) msg.textContent = t; }
+      say('PDF와 결산 자료를 만드는 중…');
+      var t = new Date(), jn = '결산서_자료_' + t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + '.json', pn = claudeName(mode) + '.pdf';
+      var p = claudeCanvases(mode); if (!p) { say('⚠ 이 서류는 PDF를 만들 수 없습니다.'); return; }
+      p.then(function (cs) {
+        var pdf = makePdf(cs), txt = backupJson(), jb = new Blob([txt], { type: 'application/json' }), files = null;
+        function mk(b, n, ty) { try { return new File([b], n, { type: ty }); } catch (e) { return null; } }
+        function ok(f) { try { return !!(f && navigator.canShare && navigator.canShare({ files: f })); } catch (e) { return false; } }
+        var pf = mk(pdf, pn, 'application/pdf');
+        [mk(txt, jn, 'application/json'), mk(txt, jn, 'text/plain')].some(function (jf) { if (pf && jf && ok([pf, jf])) { files = [pf, jf]; return true; } return false; });
+        if (!files && ok([pf])) files = [pf];   // 두 파일을 같이 못 보내면 PDF만 공유 창, 결산 자료는 내려받기
+        markBackup();
+        function sheet() {
+          var old = document.getElementById('pdfSheet'); if (old) old.remove();
+          var pu = URL.createObjectURL(pdf), ju = URL.createObjectURL(jb), d = document.createElement('div'); d.id = 'pdfSheet';
+          d.innerHTML = '<div class="ps-box"><div class="ps-t">🤖 Claude에게 보낼 파일이 준비됐습니다</div><div class="ps-n">' + esc(pn) + '<br>' + esc(jn) + '</div>' +
+            (files ? '<button type="button" class="ps-go" id="psShare">📤 보내기 (공유 창에서 Claude 선택)</button>' : '') +
+            '<a class="ps-go ps-open" href="' + pu + '" download="' + esc(pn) + '" target="_blank" rel="noopener">📄 PDF 열기 · 내려받기</a>' +
+            '<a class="ps-go ps-open" href="' + ju + '" download="' + esc(jn) + '" target="_blank" rel="noopener">📂 결산 자료 내려받기</a>' +
+            '<button type="button" class="ps-x" id="psClose">닫기</button>' +
+            '<div class="ps-h">' + (files && files.length === 1 ? '이 휴대폰은 두 파일을 한 번에 보낼 수 없어 PDF만 공유 창으로 보냅니다. 결산 자료는 내려받아 Claude 대화창에 따로 올려 주세요.' : '공유 창에서 Claude를 고르면 두 파일이 대화창에 함께 올라갑니다. Claude가 없으면 「파일에 저장」한 뒤 대화창에서 첨부하세요.') + '</div></div>';
+          document.body.appendChild(d);
+          d.addEventListener('click', function (e) {
+            if (e.target.id === 'psShare') navigator.share({ files: files, title: pn }).then(function () { say('✔ 보냈습니다: ' + files.map(function (f) { return f.name; }).join(', ')); d.remove(); }).catch(function (er) { if (!(er && er.name === 'AbortError')) say('⚠ 공유하지 못했습니다: ' + (er && er.message)); });
+            if (e.target.id === 'psClose' || e.target === d) { d.remove(); setTimeout(function () { URL.revokeObjectURL(pu); URL.revokeObjectURL(ju); }, 60000); }
+          });
+          say('✔ 준비됐습니다. 「보내기」를 누르세요.');
+        }
+        if (files && files.length === 2) {   // 바로 공유 창 (만드는 데 시간이 걸려 아이폰이 막으면 「보내기」 창으로)
+          try { navigator.share({ files: files, title: pn }).then(function () { say('✔ 보냈습니다: ' + pn + ', ' + jn); }).catch(function (e) { if (e && e.name === 'AbortError') say('취소했습니다.'); else sheet(); }); }
+          catch (e) { sheet(); }
+        } else sheet();
+      }).catch(function (e) { say('⚠ PDF를 만들지 못했습니다: ' + (e && e.message)); });
+    }
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-claude]'); if (!b) return;
+      e.preventDefault(); sendToClaude(b.getAttribute('data-claude'), b);
     });
     // 맨 위 「결산 자료 저장 · 보내기」: 백업과 같은 파일(.json)을 아이폰 공유 창으로 → Claude 앱으로 보내기 또는 「파일에 저장」
     $('btnSkillSave').addEventListener('click', function () {
@@ -5044,7 +5107,7 @@ body{
       var box = $('titleBox'); if (!box) return;
       if (!box.querySelector('#tpTitle')) {
         box.innerHTML = '<div class="tp-form no-print"><label>표지 제목 <input id="tpTitle"></label><label>총회 날짜 <input id="tpDate" type="date"></label>' +
-          '<label class="cv-add" style="display:inline-block;margin:0">✍ 결재란 그림 넣기<input type="file" id="tpAppr" accept="image/*" hidden></label> <button type="button" class="cv-del" id="tpApprDel" style="width:auto;padding:0 8px">결재란 빼기</button> <span id="tpApprMsg" class="bz-hint"></span><br><button type="button" class="cv-add" data-pdf="annual" style="display:inline-block;margin-top:6px">🔍 결산서(표지 ~ 결의서) 미리보기 · 고치기 → PDF / 한글 저장</button> <span class="bz-hint pdf-msg"></span></div><img class="tp-img" id="tpImg" alt="표지">' +
+          '<label class="cv-add" style="display:inline-block;margin:0">✍ 결재란 그림 넣기<input type="file" id="tpAppr" accept="image/*" hidden></label> <button type="button" class="cv-del" id="tpApprDel" style="width:auto;padding:0 8px">결재란 빼기</button> <span id="tpApprMsg" class="bz-hint"></span><br><button type="button" class="cv-add cl-btn" data-claude="annual" style="display:inline-block;margin-top:6px">🤖 Claude에게 보내기 <small>(PDF + 결산 자료)</small></button> <button type="button" class="cv-add" data-pdf="annual" style="display:inline-block;margin-top:6px">🔍 결산서(표지 ~ 결의서) 미리보기 · 고치기 → PDF / 한글 저장</button> <span class="bz-hint pdf-msg"></span></div><img class="tp-img" id="tpImg" alt="표지">' +
           '<p class="bz-hint no-print">한글 파일 맨 앞(결산 보고서를 넣으면 그 바로 뒤)에 이 모양으로 한 장 들어갑니다. 한글에서 글자를 직접 고칠 수도 있습니다. 제목을 비우면 「' + year + '년 정기주주총회 결산서」로 자동.</p>';
         box.addEventListener('change', function (e) {   // 결재란(대표이사 서명·감사 도장) 그림: 흰 여백을 잘라내고 줄여서 이 기기에만 저장
           if (e.target.id !== 'tpAppr') return;
@@ -5430,7 +5493,8 @@ body{
     }
     function docButtons(id) {
       return '<p class="no-print"><button type="button" class="cv-add" data-docpng="' + id + '" style="display:inline-block">📷 사진으로 저장</button> ' +
-        '<button type="button" class="cv-add ed-open" data-docedit="' + id + '" style="display:inline-block">🔍 미리보기 · 고치기 → 한글 / PDF 저장</button> ' + '<span class="bz-hint" id="docMsg-' + id + '"></span></p>';
+        '<button type="button" class="cv-add ed-open" data-docedit="' + id + '" style="display:inline-block">🔍 미리보기 · 고치기 → 한글 / PDF 저장</button> ' +
+        (id === 'board' ? '<button type="button" class="cv-add cl-btn" data-claude="board" style="display:inline-block">🤖 Claude에게 보내기 <small>(PDF + 결산 자료)</small></button> ' : '') + '<span class="bz-hint" id="docMsg-' + id + '"></span></p>';
     }
     function docPreview(blocks) {   // 화면 미리보기 (인쇄 안 함)
       var h = '<div class="doc-prev">';
