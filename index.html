@@ -1021,7 +1021,7 @@ body{
 </head>
 <body>
   <!-- 맨 위: 이사회 회의록 스킬에 올릴 결산 자료(백업과 같은 파일) 저장 · 보내기 -->
-  <div class="sk-bar no-print"><button type="button" id="btnSkillSave">📤 결산 자료 저장 · 보내기 <small>(이사회 회의록 스킬용)</small></button><span id="skMsg" class="sk-msg" aria-live="polite"></span></div>
+  <div class="sk-bar no-print"><button type="button" id="btnSkillSave">💾 전체 백업 저장 <small>(결산서·주주총회 결산서·이사회·의사록·주주명부 모두)</small></button><span id="skMsg" class="sk-msg" aria-live="polite"></span></div>
   <!-- =========================================================
        ① 월 결산 보고서
        ========================================================= -->
@@ -3111,6 +3111,9 @@ body{
         });
       } finally { year = keep; }
       out.itemsReport = rep;
+      // 월 결산 보고서(카톡 공지) 칸·은행 자동 설정 등 따로 저장되는 것도 함께 (한글 원본 양식·공문 붙임 파일은 빼고)
+      var lo = {}; try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (/^YEOMJEON_/.test(k) || k === 'income-expense-ledger:auto') lo[k] = localStorage.getItem(k); } } catch (e) { }
+      out._local = lo;
       return JSON.stringify(out, null, 2);
     }
     $('btnExport').addEventListener('click', function () {
@@ -3185,7 +3188,7 @@ body{
     });
     // 맨 위 「결산 자료 저장 · 보내기」: 백업과 같은 파일(.json)을 아이폰 공유 창으로 → Claude 앱으로 보내기 또는 「파일에 저장」
     $('btnSkillSave').addEventListener('click', function () {
-      var t = new Date(), name = '결산서_자료_' + t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + '.json', msg = $('skMsg');
+      var t = new Date(), name = '염전마을_전체백업_' + t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + '.json', msg = $('skMsg');
       var txt; try { txt = backupJson(); } catch (e) { msg.textContent = '⚠ 자료를 만들지 못했습니다: ' + e.message; return; }
       var blob = new Blob([txt], { type: 'application/json' }), file = null;
       function mk(type) { try { return new File([txt], name, { type: type }); } catch (e) { return null; } }
@@ -3195,10 +3198,10 @@ body{
       function sheet() {
         var old = document.getElementById('pdfSheet'); if (old) old.remove();
         var url = URL.createObjectURL(blob), d = document.createElement('div'); d.id = 'pdfSheet';
-        d.innerHTML = '<div class="ps-box"><div class="ps-t">📤 결산 자료가 준비됐습니다</div><div class="ps-n">' + esc(name) + '</div>' +
+        d.innerHTML = '<div class="ps-box"><div class="ps-t">💾 전체 백업이 준비됐습니다</div><div class="ps-n">' + esc(name) + '</div>' +
           (file ? '<button type="button" class="ps-go" id="psShare">📤 저장 · 보내기</button>' : '') +
           '<a class="ps-go ps-open" href="' + url + '" download="' + esc(name) + '" target="_blank" rel="noopener">📂 파일 열기 · 내려받기</a>' +
-          '<button type="button" class="ps-x" id="psClose">닫기</button><div class="ps-h">이사회 회의록을 쓸 때 이 파일을 Claude 대화창에 올리면 전월 잔액·수입·예상 지출이 자동으로 들어갑니다.</div></div>';
+          '<button type="button" class="ps-x" id="psClose">닫기</button><div class="ps-h">앱의 모든 자료가 이 파일 하나에 들어 있습니다. 「파일에 저장」해 두거나 Claude 「결산서」 방에 올려 두세요. 되살릴 때는 「백업 불러오기」.</div></div>';
         document.body.appendChild(d);
         d.addEventListener('click', function (e) {
           if (e.target.id === 'psShare') navigator.share({ files: [file], title: name }).then(function () { msg.textContent = '✔ 보냈습니다(저장했습니다).'; d.remove(); }).catch(function (er) { if (!(er && er.name === 'AbortError')) msg.textContent = '⚠ 공유하지 못했습니다: ' + (er && er.message); });
@@ -3223,12 +3226,18 @@ body{
           if (!d || !d.years || !Object.keys(d.years).length) throw new Error('형식 오류');
           if (!window.confirm('지금 장부를 백업 파일 내용으로 바꿉니다. 계속할까요?')) return;
           delete d.itemsReport;   // 항목별 합계는 불러온 뒤 장부에서 다시 계산
+          var LO = d._local; delete d._local;   // 전체 백업: 월 결산 보고서 칸 등도 되살림
+          if (LO && typeof LO === 'object') Object.keys(LO).forEach(function (k) { if (/^YEOMJEON_/.test(k) || k === 'income-expense-ledger:auto') try { localStorage.setItem(k, LO[k]); } catch (e4) { } });
           db = d;
           fixData();   // 처음 열 때와 똑같이 자료 손질 → 다시 열지 않아도 숫자가 같게
           start();
           try { syncYM(); syncReportHeads(true); preview(); fitLedger(); } catch (e2) { }
           markBackup();   // 방금 불러온 백업과 같으므로 알림 없음
-          setTimeout(function () { try { save(); markBackup(); } catch (e3) { } }, 1500);   // 불러온 뒤 화면이 자료를 정리한 것까지 포함해서 (다시 열었을 때 「바뀐 내용」 알림이 잘못 뜨지 않게)
+          setTimeout(function () { try { save(); markBackup(); } catch (e3) { } }, 1500);
+          if (LO && Object.keys(LO).length) setTimeout(function () {   // 화면이 자동 계산으로 덮어쓴 것을 백업 내용으로 다시 넣고 곧바로 새로 열기
+            Object.keys(LO).forEach(function (k) { if (/^YEOMJEON_/.test(k) || k === 'income-expense-ledger:auto') try { localStorage.setItem(k, LO[k]); } catch (e6) { } });
+            try { location.reload(); } catch (e5) { }
+          }, 2200);   // 월 결산 보고서 칸은 처음 열 때 읽으므로 한 번 새로 열어 복구 내용을 보여 줌   // 불러온 뒤 화면이 자료를 정리한 것까지 포함해서 (다시 열었을 때 「바뀐 내용」 알림이 잘못 뜨지 않게)
         } catch (err) { window.alert('백업 파일을 읽을 수 없습니다: ' + err.message); }
       };
       r.readAsText(f, 'utf-8');
