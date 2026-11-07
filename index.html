@@ -5822,15 +5822,19 @@ body{
       L.push({ gap: 1 });
       o(M + '월 예상 총지출 :  약 ' + rough(N.expN));
       o(M + '월 예상 통장잔액 :  ' + (N.balN == null ? blank : '약 ' + rough(N.balN)));
-      var ex = bbExtra(B), desc = B.agDesc || {};
-      if (ex.length) {
-        L.push({ gap: 1 }); o('안   건');
-        ex.forEach(function (i) {
-          var q = String(B.agendas[i] || '').trim(); if (!q) return;
-          L.push({ t: '-  제' + (i + 1) + '호 :  ' + q, lv: 1, ag: 1 });
-          String(desc[q] || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (s) { L.push({ t: s, lv: 2, ag: 1 }); });
-        });
-      }
+      // 안건: 회의록과 같은 번호(빈 칸 뺀 순서). 보상금(제1호)은 위 숫자로 갈음, 적은 안건 → 기타 안건 순
+      var desc = B.agDesc || {}, list = (B.agendas || []).map(function (q) { return String(q || '').trim(); }).filter(Boolean);
+      L.push({ gap: 1 }); o('안   건');
+      list.forEach(function (q, k) {
+        if (bbIsComp(q)) return;
+        L.push({ t: '-  제' + (k + 1) + '호 :  ' + q, lv: 1, ag: 1 });
+        if (!bbIsEtc(q)) String(desc[q] || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (s) { L.push({ t: s, lv: 2, ag: 1 }); });
+      });
+      // 맨 아래: 회의 일시·장소 (이사회 회의록에 적은 값)
+      var wd = wdayOf(B.date), dm = String(B.date || '').match(/^\d{4}-(\d{2})-(\d{2})$/);
+      L.push({ gap: 1 });
+      o('일   시 :  ' + (dm ? (+dm[1]) + '월 ' + (+dm[2]) + '일' + (wd ? '(' + wd.charAt(0) + ')' : '') : '　　월　　일') + (timeTxt(B.start) ? ' ' + timeTxt(B.start) : ''));
+      o('장   소 :  ' + (String(B.place || '').trim() || '　　　　'));
       return { L: L, M: M, R: R, N: N };
     }
     function bbCanvas(ratio) {   // ratio: A4 = 297/210, 휴대폰 사진 = 1.95
@@ -5889,6 +5893,7 @@ body{
       var h = '<div class="cv-title">이 사 회 안 내 문</div>' +
         '<p class="bz-hint no-print">보내 주신 「11월 이사회」 한 장 그대로 만듭니다. <b>매달 1일</b>이 되면 그달 안내문으로 바뀌고, ' + N.PM + '월 통장잔액·대략 지출·예상 잔액은 장부에서 자동으로 들어갑니다. <b>' + N.M + '월 예상 수입만</b> 적으세요(이사회 회의록의 예상 수입과 같은 칸). 아래 「안건」을 적으면 이사회 회의록 <b>제2호 의안부터</b> 자동으로 들어갑니다.</p>' +
         '<div class="no-print bd-form">' +
+        '<p><b>회의 일시</b> <input type="date" data-bb="date" value="' + esc(B.date || '') + '"> <input type="time" data-bb="start" value="' + esc(B.start || '') + '"> · <b>장소</b> <input class="w" data-bb="place" placeholder="하사6구마을회관" value="' + esc(B.place || '') + '"> <span class="bz-hint">이사회 회의록의 일시·장소와 같은 칸 (여기서 적으면 회의록에도 자동)</span></p>' +
         '<p><b>' + N.M + '월 예상 수입</b> <input data-bb="inc" inputmode="numeric" placeholder="예: 30,000,000" value="' + esc(String(B.inc == null ? '' : B.inc).replace(/\D/g, '') ? C.formatWon(+String(B.inc).replace(/\D/g, '')) : '') + '"> 원 <span class="bz-hint">' + (N.incN == null ? '비우면 「약 　만 원」 빈칸' : '→ 약 ' + rough(N.incN)) + '</span></p>' +
         '<p><b>안건</b> <span class="bz-hint">제목과 내용(한두 줄)을 적으면 회의록에 설명·표결 문장이 자세히 들어갑니다. 금액을 적으면(예: 50만 원) 지급 후 예상 잔액도 계산합니다.</span></p>' +
         ex.map(function (i) {
@@ -5906,6 +5911,13 @@ body{
       function rer() { try { renderBrief(); renderBoard(); } catch (e) { } }
       box.addEventListener('input', function (e) {
         var el = e.target, B = boardData().B;
+        var bk = el.getAttribute('data-bb');
+        if (bk === 'start') {   // 시작 시각을 바꾸면 끝나는 시각도 같은 회의 길이(없으면 30분)만큼 뒤로
+          var mn = function (t) { var m = String(t || '').match(/^(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : null; };
+          var s0 = mn(B.start), e0 = mn(B.end), s1 = mn(el.value), du = s0 != null && e0 != null && e0 > s0 ? e0 - s0 : 30;
+          if (s1 != null) { var e1 = Math.min(s1 + du, 23 * 60 + 59); B.end = pad(Math.floor(e1 / 60)) + ':' + pad(e1 % 60); }
+        }
+        if (bk === 'date' || bk === 'start' || bk === 'place') { B[bk] = el.value; saveSoon(); return; }   // 회의록과 같은 칸
         if (el.getAttribute('data-bb') === 'inc') {   // 숫자만 남기고 쉼표 자동 (30000000 → 30,000,000)
           var dg = el.value.replace(/\D/g, ''); el.value = dg ? C.formatWon(+dg) : ''; B.inc = el.value; saveSoon(); return;
         }
