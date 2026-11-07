@@ -5856,7 +5856,7 @@ body{
       var box = $('boardBox'); if (!box || box.contains(document.activeElement)) return;
       var X = boardCtx(), R = X.R, B = X.B, O = X.O, N = X.N;
       var keys = Object.keys(db.board).sort().reverse();
-      var inp = function (k, ph, cls, type) { return '<input data-bd="' + k + '"' + (type ? ' type="' + type + '"' : '') + (cls ? ' class="' + cls + '"' : '') + ' placeholder="' + (ph || '') + '" value="' + esc(B[k] == null ? '' : B[k]) + '">'; };
+      var inp = function (k, ph, cls, type) { var v = B[k] == null ? '' : B[k]; if ((k === 'per' || k === 'inc') && String(v).replace(/\D/g, '')) v = C.formatWon(+String(v).replace(/\D/g, '')); return '<input data-bd="' + k + '"' + (k === 'per' || k === 'inc' || k === 'nay' ? ' inputmode="numeric"' : '') + (type ? ' type="' + type + '"' : '') + (cls ? ' class="' + cls + '"' : '') + ' placeholder="' + (ph || '') + '" value="' + esc(v) + '">'; };
       var h = '<div class="cv-title">이 사 회 회 의 록</div>' +
         '<p class="bz-hint no-print">보내 주신 「11월 이사회 회의록」 틀 그대로 만듭니다. 안건 이름을 적으면 그 안건에 맞는 회의 내용이 자동으로 들어가고(직접 고칠 수 있음, 다 지우면 다시 자동), 보상금 안건에는 장부의 <b>전달</b> 통장잔액·수입·지출과 이번 달 예상이 자동으로 들어갑니다. 정족수 문구는 정관 제35조 제1항에 맞게 고쳤고, 주민등록번호는 넣지 않습니다.</p>' +
         '<div class="no-print bd-form">' +
@@ -6048,6 +6048,7 @@ body{
       box.addEventListener('input', function (e) {
         var el = e.target, k = el.getAttribute('data-bd'), R = boardData(), B = R.B;
         if (el.id === 'bdMonth') { if (/^\d{4}-\d{2}$/.test(el.value)) { var nw = new Date(); db.boardCur = el.value; db.boardCurAt = nw.getFullYear() + '-' + pad(nw.getMonth() + 1); saveSoon(); } return; }
+        if (k === 'per' || k === 'inc') { var dg3 = el.value.replace(/\D/g, ''); el.value = dg3 ? C.formatWon(+dg3) : ''; }   // 금액 칸: 쉼표 자동
         if (k) { B[k] = el.type === 'checkbox' ? el.checked : el.value; saveSoon(); if (el.type === 'checkbox') { el.blur(); renderBoard(); } return; }
         var ai = el.getAttribute('data-bdag');
         if (ai != null) {   // 안건 이름: 직접 고친 문장이 없으면 회의 내용을 새로 만듦
