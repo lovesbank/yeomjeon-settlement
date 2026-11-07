@@ -744,6 +744,9 @@ body{
   #ledger .cv-h{ font-size:19px; font-weight:800; margin:22px 0 8px; }
   #ledger .cv-pl{ font-size:17px; font-weight:700; margin:6px 0 2px; }
   #ledger #coverBox{ font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif; }
+  .vt-box{ margin:6px 0 4px; } .vt-row{ display:flex; align-items:center; gap:6px; margin:4px 0; } .vt-n{ min-width:4.2em; font-size:15px; }
+  .vt-btn{ font:inherit; font-size:14px; padding:5px 12px; border:1px solid #bbb; border-radius:14px; background:#fff; color:#333; }
+  .vt-btn.vt-y.on{ background:#2e7d32; border-color:#2e7d32; color:#fff; } .vt-btn.vt-n.on{ background:#c62828; border-color:#c62828; color:#fff; } .vt-btn.vt-a.on{ background:#757575; border-color:#757575; color:#fff; }
   .bb-prev{ margin:10px 0; } .bb-prev img{ display:block; width:100%; max-width:620px; border:1px solid #ccc; box-shadow:0 1px 4px rgba(0,0,0,.15); }
   #ledger .cv-purpose{ display:block; width:100%; font:inherit; font-size:17px; line-height:1.6; padding:8px 10px; border:1px solid var(--lg-btn-line); border-radius:4px; resize:vertical; }
   #ledger table.cv-tbl{ font-size:17px; max-width:820px; margin:0 auto; }
@@ -5569,7 +5572,7 @@ body{
           var pm = +prevK.slice(5, 7), dd = Math.min(+(String(P0.date || '').slice(8, 10) || 1), new Date(y, m, 0).getDate()) || 1;
           var NB = JSON.parse(JSON.stringify(P0));
           NB.date = y + '-' + pad(m) + '-' + pad(dd); NB.docNo = y + '-' + pad(m); NB.notice = ''; NB.inc = ''; delete NB.agText;
-          var PD = P0.agDesc || {}; delete NB.agDesc;   // 이사회 안내문에서 적은 안건(내용 있는 것)은 그달 한 번만 → 다음 달로 넘기지 않음
+          var PD = P0.agDesc || {}; delete NB.agDesc; delete NB.agMemo; delete NB.agVote;   // 이사회 안내문에서 적은 안건(내용 있는 것)은 그달 한 번만 → 다음 달로 넘기지 않음
           NB.agendas = (P0.agendas || []).filter(function (q) { return PD[q] == null; }).map(function (q) { return String(q || '').replace(new RegExp('(^|[^0-9])' + pm + '월', 'g'), '$1' + m + '월'); });
           db.board[cur] = NB;
         } else db.board[cur] = { date: y + '-' + pad(m) + '-01', start: '11:00', end: '11:30', place: '하사6구마을회관', skip: true, notice: '', absent: {}, per: 500000, inc: '', no: '반대', agendas: [m + '월 주민 피해보상금 지급에 관한 건', '기타 안건'], etc: '안건 제시가 없어 심의를 마쳤다', seal3: '', nay: 0, docNo: y + '-' + pad(m) };
@@ -5596,12 +5599,70 @@ body{
       return { fixedItems: fixedItems, Y: Y, M: Mn, PY: PY, PM: PM, bal: bal, inc: inc, items: items, etc: etc, tot: tot, others: oOrder.map(function (n) { return [n, others[n]]; }), units: units, comp: comp, big: big, expN: expN, incN: incN, balN: incN == null ? null : bal + incN - expN };
     }
     // 안건 이름 → 이사회 회의 내용 (보내 주신 회의록 말투: □ 큰 항목, ○ 작은 항목, - 세부). 정관 조항은 이사회 의결 사항(제34조) 기준
+    // 회의 메모(짧게 적은 것) → 회의록 문장. 예: 「박균환 300 지급 주장」 「반대 이공임 너무 많음」 「찬성 김효임 박균환」 「찬성 전원」 「기권 정선만」
+    function bbMemo(q, X) {   // q = 안건 이름
+      var memo = String(((X.B || {}).agMemo || {})[q] || '').trim(), V = ((X.B || {}).agVote || {})[q] || {};
+      if (!memo && !Object.keys(V).length) return null;
+      var O = X.O || [], names = O.map(function (o) { return o.name; }).filter(Boolean).sort(function (a, b) { return b.length - a.length; });
+      var roleOf = function (n) { var o = O.filter(function (x) { return x.name === n; })[0]; return o ? (/대표/.test(o.role) ? '대표이사' : /감사/.test(o.role) ? '감사' : '이사') : '이사'; };
+      var who = function (L2) { return L2.map(function (n) { return n + ' ' + roleOf(n); }).join(', '); };
+      var found = function (t) { var out = [], pos = []; names.forEach(function (n) { var i = t.indexOf(n); if (i >= 0 && out.indexOf(n) < 0 && !pos.some(function (p) { return i >= p[0] && i < p[1]; })) { out.push([i, n]); pos.push([i, i + n.length]); } }); return out.sort(function (a, b) { return a[0] - b[0]; }).map(function (x) { return x[1]; }); };
+      var strip = function (t, L2, words) { L2.concat(words || []).forEach(function (n) { t = t.split(n).join(' '); }); return t.replace(/\s*(이사|감사|대표이사)(는|가|님)?\s/g, ' ').replace(/[,·、]/g, ' ').replace(/\s+/g, ' ').trim(); };
+      var end = function (t) { return /[.。]$/.test(t) ? t : /(함|음|임|됨|다)$/.test(t) ? t + '.' : t + '.'; };
+      var R = { lines: [], nay: [], yes: [], abst: [], yesAll: false, amt: 0 };
+      memo.split('\n').map(function (t) { return t.trim().replace(/^[-·•○□]\s*/, ''); }).filter(Boolean).forEach(function (t) {
+        var ns = found(t), rest;
+        if (/반대/.test(t)) {
+          rest = strip(t, ns, ['반대함', '반대']); ns.forEach(function (n) { if (R.nay.indexOf(n) < 0) R.nay.push(n); });
+          if (ns.length) R.lines.push('○ ' + who(ns) + josa(roleOf(ns[ns.length - 1]), '은', '는') + ' 반대 의견을 밝힘' + (rest ? '(사유 : ' + rest + ')' : '') + '.');
+          else if (rest) R.lines.push('○ 반대 의견 : ' + end(rest));
+        } else if (/찬성/.test(t)) {
+          if (/전원|모두/.test(t)) { R.yesAll = true; if (!found(t).length) R.lines.push('○ 출석 이사 전원이 찬성 의견을 밝힘.'); }
+          ns.forEach(function (n) { if (R.yes.indexOf(n) < 0) R.yes.push(n); });
+          rest = strip(t, ns, ['찬성함', '찬성', '전원', '모두']);
+          if (ns.length) R.lines.push('○ ' + who(ns) + josa(roleOf(ns[ns.length - 1]), '은', '는') + ' 찬성 의견을 밝힘' + (rest ? '(' + rest + ')' : '') + '.');
+        } else if (/기권/.test(t)) {
+          ns.forEach(function (n) { if (R.abst.indexOf(n) < 0) R.abst.push(n); });
+          if (ns.length) R.lines.push('○ ' + who(ns) + josa(roleOf(ns[ns.length - 1]), '은', '는') + ' 표결에 기권함.');
+        } else if (ns.length) {
+          var a = bbAmount(t); if (!a) { var m = t.replace(new RegExp(ns.join('|'), 'g'), ' ').match(/(\d[\d,]*)/); if (m) { a = parseInt(m[1].replace(/,/g, ''), 10) || 0; if (a && a < 100000) a *= 10000; } }   // 「300」 = 300만 원
+          var sp = ns[0], spk = who([sp]), ga = josa(roleOf(sp), '이', '가'), verb = /주장/.test(t) ? '주장함.' : /의견/.test(t) ? '의견을 밝힘.' : '제안함.';
+          if (a && /보상/.test(q)) R.lines.push('○ ' + spk + ga + ' 1가구당 보상금을 ' + rough(a) + '으로 하자는 ' + (/주장/.test(t) ? '주장을 함.' : /의견/.test(t) ? '의견을 밝힘.' : '제안을 함.'));   // 보상금은 1가구당 금액 (의결은 위 칸의 금액)
+          else if (a) { R.amt = a; R.lines.push('○ ' + spk + ga + ' ' + C.formatWon(a) + '원을 지급(집행)하자고 ' + verb); }
+          else if (/추천/.test(t) && ns.length > 1) R.lines.push('○ ' + spk + ga + ' ' + who(ns.slice(1)) + '를 ' + (strip(t, ns, ['추천함', '추천']) || '후보').replace(/(으로|로)$/, '') + '로 추천함.');
+          else { rest = strip(t, [sp]); R.lines.push('○ ' + spk + josa(roleOf(sp), '은', '는') + ' 「' + rest + '」' + josa(rest, '이라는', '라는') + ' 의견을 밝힘.'); }
+        } else R.lines.push('○ ' + end(t));
+      });
+      // 찬성·반대·기권 버튼으로 고른 것이 메모보다 우선
+      var bN = [], bA = [];
+      Object.keys(V).forEach(function (n) {
+        [R.yes, R.nay, R.abst].forEach(function (Ls) { var k = Ls.indexOf(n); if (k >= 0) Ls.splice(k, 1); });
+        (V[n] === 'y' ? R.yes : V[n] === 'n' ? R.nay : R.abst).push(n);
+        if (V[n] !== 'y' && !R.lines.some(function (l) { return l.indexOf(n) >= 0; })) (V[n] === 'n' ? bN : bA).push(n);
+      });
+      var ord = (X.O || []).map(function (o) { return o.name; }), so = function (L2) { return L2.sort(function (a, b) { return ord.indexOf(a) - ord.indexOf(b); }); };   // 명단 순서로 한 줄에
+      if (bN.length) R.lines.push('○ ' + who(so(bN)) + '는 반대 의견을 밝힘.');
+      if (bA.length) R.lines.push('○ ' + who(so(bA)) + '는 표결에 기권함.');
+      // 표결: 출석 이사 기준. 반대·기권을 뺀 나머지는 찬성 (「찬성 이름」만 적었으면 그 사람들만 찬성)
+      var A = (X.dInL || []).map(function (o) { return o.name; }), nay = R.nay.filter(function (n) { return A.indexOf(n) >= 0; }), ab = R.abst.filter(function (n) { return A.indexOf(n) >= 0; });
+      var yes = R.yes.length && !R.yesAll ? R.yes.filter(function (n) { return A.indexOf(n) >= 0 && nay.indexOf(n) < 0; }) : A.filter(function (n) { return nay.indexOf(n) < 0 && ab.indexOf(n) < 0; });
+      R.yesN = yes.length; R.nayN = nay.length; R.pass = yes.length * 2 > A.length;
+      R.voteHead = !nay.length && !ab.length && yes.length === A.length
+        ? '출석이사 ' + A.length + '명 전원(' + yes.join(', ') + ')이 찬성하여'
+        : '출석이사 ' + A.length + '명 중 찬성 ' + yes.length + '명(' + (yes.join(', ') || '없음') + ')' + (nay.length ? ', 반대 ' + nay.length + '명(' + nay.join(', ') + ')' : '') + (ab.length ? ', 기권 ' + ab.length + '명(' + ab.join(', ') + ')' : '') + (function () { var nx = A.filter(function (n) { return yes.indexOf(n) < 0 && nay.indexOf(n) < 0 && ab.indexOf(n) < 0; }); return nx.length ? ', 의사 표시 없음 ' + nx.length + '명(' + nx.join(', ') + ')' : ''; })() + '으로';
+      return R;
+    }
     function boardAgendaLines(q, no, X) {
       var t = String(q || '').replace(/\s+/g, ''), L = [], b = function (s2, ind) { L.push({ t: s2, ind: ind }); }, w = C.formatWon;
       var N = X.N, ceo = X.ceo, gi = X.gi, ny = (X.N.Y + 1) + '년도';
       var open = '□ ' + ceo + ' 대표이사가 제' + no + '호 의안 「' + q + '」' + josa(q, '을', '를') + ' 부의안건으로 상정하고 토의하였다.';
       var VOTE = X.nay ? '출석이사 ' + X.dIn + '명 중 찬성 ' + X.yes + '명, 반대 ' + X.nay + '명으로 정관 제35조 제1항에 따라 원안대로 ' + (X.pass ? '가결하였다.' : '부결되었다.')
                        : '출석이사 ' + X.dIn + '명 전원이 만장일치로 찬성하여 정관 제35조 제1항에 따라 원안대로 가결하였다.';
+      var MM = /기타/.test(t) ? null : bbMemo(q, X), dsc = String(((X.B || {}).agDesc || {})[q] || '').trim(), amt0 = dsc ? bbAmount(dsc) : 0;
+      var amtF = MM && MM.amt && !/보상/.test(t) ? MM.amt : amt0;   // 의결 금액 = 회의에서 마지막에 제안된 금액
+      if (MM) VOTE = MM.voteHead + ' 정관 제35조 제1항에 따라 ' + (MM.pass
+        ? (MM.amt && !/보상/.test(t) ? (amt0 && MM.amt !== amt0 ? '지급(집행) 금액을 ' + w(MM.amt) + '원으로 수정하여 ' : '지급(집행) 금액 ' + w(MM.amt) + '원으로 ') : '원안대로 ') + '가결하였다.'
+        : '찬성이 출석이사 과반수에 이르지 못하여 부결되었다.');
       if (/기타/.test(t)) { b('□ ' + ceo + ' 대표이사가 기타 안건을 질문하자 ' + (X.etc || '안건 제시가 없어 회의를 마무리하였다') + (/[.]$/.test(X.etc || '') ? '' : '.'), 1); return L; }
       if (/보상/.test(t)) {
         b(open, 1);
@@ -5619,6 +5680,7 @@ body{
         b('※ 참고사항 ※', 1);
         b('○ 1가구당 ' + rough(X.per).replace(/^약 /, '') + ' 지급 시 지급 총액 : ' + w(N.comp) + '원 (주주 ' + X.S.hh + '가구' + (+X.S.extra ? ' 및 ' + X.S.name + ' ' + X.S.extra + '몫' : '') + ', 총 ' + N.units + '몫)', 2);
         b('○ ' + rough(X.per).replace(/^약 /, '') + ' 지급 시 예상 잔액 : ' + (N.balN == null ? '약 　　　　만 원' : '약 ' + rough(N.balN)), 2);
+        if (MM) { b('○ ' + ceo + ' 대표이사가 이사들에게 의견을 물음.', 2); MM.lines.forEach(function (s4) { b(s4, 2); }); }
         b('□ ' + ceo + ' 대표이사가 월 수입금액과 대략적인 지출금액을 이사들에게 보고하고 1가구당 보상금 ' + rough(X.per).replace(/^약 /, '') + '을 지급하자고 제안하자, ' + VOTE, 1);
         return L;
       }
@@ -5683,16 +5745,24 @@ body{
         b('○ 안건의 취지와 주요 내용을 설명함.', 2);
         b('- 주요 내용 : ○○○○', 3);
       }
-      var dsc = String(((X.B || {}).agDesc || {})[q] || '').trim();
-      if (dsc) {   // 이사회 안내문에서 적은 내용 → 설명·금액·잔액을 채우고 ○○○○ 빈칸 줄은 뺌
-        var amt = bbAmount(dsc), body = L.splice(1).filter(function (l) { return !(amt && /^○ 지급 후 예상 통장잔액/.test(l.t)) && !/○○/.test(l.t) && !/차감 전/.test(l.t) && !/^○ (마을 행사 등에 대한 지원의 목적과 내용|안건의 취지와 주요 내용|자금 차입의 필요성과 조건)을 설명함/.test(l.t); });
-        b('○ ' + ceo + ' 대표이사가 이 안건을 상정한 취지와 내용을 다음과 같이 설명함.', 2);
-        dsc.split('\n').map(function (s3) { return s3.trim().replace(/^[-·•○]\s*/, ''); }).filter(Boolean).forEach(function (s3) { b('- ' + s3, 3); });
-        if (amt) b('- 집행(지급) 예정 금액 : ' + w(amt) + '원', 3);
+      if (dsc || MM) {   // 안내문 내용·회의 메모 → 설명·발언·금액·잔액을 채우고 ○○○○ 빈칸 줄은 뺌
+        var amt = amtF, body = L.splice(1).filter(function (l) { return !(amt && /^○ 지급 후 예상 통장잔액/.test(l.t)) && !/○○/.test(l.t) && !/차감 전/.test(l.t) && !/^○ (마을 행사 등에 대한 지원의 목적과 내용|안건의 취지와 주요 내용|자금 차입의 필요성과 조건)을 설명함/.test(l.t); });
+        if (dsc) {
+          b('○ ' + ceo + ' 대표이사가 이 안건을 상정한 취지와 내용을 다음과 같이 설명함.', 2);
+          dsc.split('\n').map(function (s3) { return s3.trim().replace(/^[-·•○]\s*/, ''); }).filter(Boolean).forEach(function (s3) { b('- ' + s3, 3); });
+          if (amt0) b('- 집행(지급) 예정 금액' + (amtF !== amt0 ? '(상정안)' : '') + ' : ' + w(amt0) + '원', 3);
+        } else b('○ ' + ceo + ' 대표이사가 안건의 취지와 내용을 설명함.', 2);
         body.forEach(function (l) { L.push(l); });
-        if (amt) b('○ 집행 후 예상 통장잔액 : ' + (N.balN == null ? '약 　　　　만 원 (이번 달 예상 수입을 적으면 자동 계산)' : '약 ' + rough(N.balN - amt) + ' (이번 달 예상 잔액 약 ' + rough(N.balN) + '에서 ' + w(amt) + '원을 뺀 금액)'), 2);
-        b('○ 이사들은 안건의 필요성과 회사 자금 사정을 함께 검토하였으며, 의결되면 회사 자금으로 집행하고 영수증 등 증빙을 갖추어 장부에 기록하기로 함.', 2);
+        if (MM) {
+          b('○ ' + ceo + ' 대표이사가 이사들에게 의견을 물음.', 2);
+          MM.lines.forEach(function (s4) { b(s4, 2); });
+          if (amtF && amtF !== amt0) b('○ 논의 결과 지급(집행) 금액을 ' + w(amtF) + '원으로 하여 표결에 부치기로 함.', 2);
+        }
+        if (amt && (!MM || MM.pass)) b('○ 집행 후 예상 통장잔액 : ' + (N.balN == null ? '약 　　　　만 원 (이번 달 예상 수입을 적으면 자동 계산)' : '약 ' + rough(N.balN - amt) + ' (이번 달 예상 잔액 약 ' + rough(N.balN) + '에서 ' + w(amt) + '원을 뺀 금액)'), 2);
+        if (dsc && !MM) b('○ 이사들은 안건의 필요성과 회사 자금 사정을 함께 검토하였으며, 의결되면 회사 자금으로 집행하고 영수증 등 증빙을 갖추어 장부에 기록하기로 함.', 2);
+        if (MM && MM.pass && amt) b('○ 의결되면 회사 자금으로 집행하고 영수증 등 증빙을 갖추어 장부에 기록하기로 함.', 2);
       }
+      if (MM) { b('□ 의장이 이사들의 의견을 들은 뒤 표결에 부친 결과, ' + VOTE, 1); return L; }
       b('□ 의장이 이사들에게 의견을 물은 바 별다른 이의가 없어 표결에 부친 결과, ' + VOTE, 1);
       return L;
     }
@@ -5790,7 +5860,14 @@ body{
         (B.agendas || []).map(function (q, i) {
           var man = (B.agText || {})[i] != null && String(B.agText[i]).trim();
           return '<div class="mn-ex"><p class="mn-q">' + (i + 1) + '호 의안 : <input class="w" data-bdag="' + i + '" placeholder="예: 12월 주민 피해보상금 지급에 관한 건" value="' + esc(q) + '"> <button type="button" class="cv-del" data-bdagdel="' + i + '" title="이 안건 지우기">－</button>' + (man ? ' <span class="bz-hint">직접 고친 문장 (다 지우면 다시 자동)</span>' : '') + '</p>' +
-            '<textarea class="cv-purpose" data-bdtx="' + i + '" rows="6">' + esc(q ? boardAgendaText(i, X) : '') + '</textarea></div>';
+            '<textarea class="cv-purpose" data-bdtx="' + i + '" rows="6">' + esc(q ? boardAgendaText(i, X) : '') + '</textarea>' +
+            (q && !bbIsEtc(q) ? '<p class="bz-hint" style="margin:6px 0 2px">📝 회의 메모 — 한 줄에 하나씩 짧게. 예: 「박균환 300 지급 주장」 「반대 이공임 너무 많음」 「찬성 전원」 「기권 정선만」 → 위 회의 내용과 표결(찬성·반대 이름)이 자동으로 바뀝니다.</p>' +
+              '<textarea class="cv-purpose" data-bdmemo="' + i + '" rows="3" placeholder="박균환 300 지급 주장&#10;반대 이공임 너무 많음">' + esc(((B.agMemo || {})[q]) || '') + '</textarea>' +
+              '<div class="vt-box"><span class="bz-hint">표결 (누르면 선택, 한 번 더 누르면 취소 · 아무것도 안 고르면 찬성 · 찬성이 출석 과반이 안 되면 자동 「부결」)</span>' +
+                '<div class="vt-row"><button type="button" class="vt-btn vt-y vt-all' + (X.dInL.length && X.dInL.every(function (o) { return (((B.agVote || {})[q] || {})[o.name]) === 'y'; }) ? ' on' : '') + '" data-bdvall="' + i + '">✔ 전원 찬성</button></div>' + X.dInL.map(function (o) {
+                var v = ((B.agVote || {})[q] || {})[o.name] || '';
+                return '<div class="vt-row"><span class="vt-n">' + esc(o.name) + '</span>' + [['y', '찬성'], ['n', '반대'], ['a', '기권']].map(function (c) { return '<button type="button" class="vt-btn vt-' + c[0] + (v === c[0] ? ' on' : '') + '" data-bdv="' + i + '|' + esc(o.name) + '|' + c[0] + '">' + c[1] + '</button>'; }).join('') + '</div>';
+              }).join('') + '</div>' : '') + '</div>';
         }).join('') +
         '<p><button type="button" class="cv-add" id="bdAgAdd" style="display:inline-block">＋ 안건 추가</button> <span class="bz-hint">예: 정기주주총회 소집의 건, 제8기 결산 승인의 건, 2027년도 사업계획 및 예산 승인의 건, 정관 변경안 승인의 건, 마을 행사 찬조의 건</span></p></div>' +
         docButtons('board') + docPreview(boardBlocks());
@@ -5894,6 +5971,8 @@ body{
         '<p class="bz-hint no-print">보내 주신 「11월 이사회」 한 장 그대로 만듭니다. <b>매달 1일</b>이 되면 그달 안내문으로 바뀌고, ' + N.PM + '월 통장잔액·대략 지출·예상 잔액은 장부에서 자동으로 들어갑니다. <b>' + N.M + '월 예상 수입만</b> 적으세요(이사회 회의록의 예상 수입과 같은 칸). 아래 「안건」을 적으면 이사회 회의록 <b>제2호 의안부터</b> 자동으로 들어갑니다.</p>' +
         '<div class="no-print bd-form">' +
         '<p><b>회의 일시</b> <input type="date" data-bb="date" value="' + esc(B.date || '') + '"> <input type="time" data-bb="start" value="' + esc(B.start || '') + '"> · <b>장소</b> <input class="w" data-bb="place" placeholder="하사6구마을회관" value="' + esc(B.place || '') + '"> <span class="bz-hint">이사회 회의록의 일시·장소와 같은 칸 (여기서 적으면 회의록에도 자동)</span></p>' +
+        '<p><b>참석</b> ' + officers().map(function (o) { var ab = (B.absent || {})[o.name]; return '<label style="margin-right:8px;white-space:nowrap"><input type="checkbox" data-bbatt="' + esc(o.name) + '"' + (ab ? '' : ' checked') + '> ' + esc(o.role) + ' ' + esc(o.name) + '</label>'; }).join('') +
+          ' <span class="bz-hint">회의록의 출석과 같은 칸 (빠진 분만 체크를 끄세요)</span></p>' +
         '<p><b>' + N.M + '월 예상 수입</b> <input data-bb="inc" inputmode="numeric" placeholder="예: 30,000,000" value="' + esc(String(B.inc == null ? '' : B.inc).replace(/\D/g, '') ? C.formatWon(+String(B.inc).replace(/\D/g, '')) : '') + '"> 원 <span class="bz-hint">' + (N.incN == null ? '비우면 「약 　만 원」 빈칸' : '→ 약 ' + rough(N.incN)) + '</span></p>' +
         '<p><b>안건</b> <span class="bz-hint">제목과 내용(한두 줄)을 적으면 회의록에 설명·표결 문장이 자세히 들어갑니다. 금액을 적으면(예: 50만 원) 지급 후 예상 잔액도 계산합니다.</span></p>' +
         ex.map(function (i) {
@@ -5925,6 +6004,7 @@ body{
         if (qi != null) {   // 제목을 바꾸면 내용도 새 제목으로 옮김
           var old = B.agendas[+qi] || '', D2 = B.agDesc = B.agDesc || {};
           if (old !== el.value && D2[old] != null) { D2[el.value] = D2[old]; delete D2[old]; }
+          [B.agMemo, B.agVote].forEach(function (Dx) { if (Dx && old !== el.value && Dx[old] != null) { Dx[el.value] = Dx[old]; delete Dx[old]; } });
           B.agendas[+qi] = el.value; saveSoon(); return;
         }
         var di = el.getAttribute('data-bbd');
@@ -5939,12 +6019,17 @@ body{
         }
         var d = t.getAttribute('data-bbdel');
         if (d != null) {
-          var q = B.agendas[+d], T2 = B.agText || {}, NT2 = {}; B.agendas.splice(+d, 1); if (B.agDesc) delete B.agDesc[q];
+          var q = B.agendas[+d], T2 = B.agText || {}, NT2 = {}; B.agendas.splice(+d, 1); if (B.agDesc) delete B.agDesc[q]; if (B.agMemo) delete B.agMemo[q]; if (B.agVote) delete B.agVote[q];
           Object.keys(T2).forEach(function (k) { var n = +k; if (n < +d) NT2[n] = T2[k]; else if (n > +d) NT2[n - 1] = T2[k]; }); B.agText = NT2;
           save(); t.blur(); rer(); return;
         }
         if (t.id === 'bbPng') { try { shareCanvases([bbCanvas(1.95)], bbName() + '.png', '이사회 안내문', msg); } catch (er) { msg.textContent = '⚠ ' + er.message; } return; }
         if (t.id === 'bbPdf') { try { sharePdf([bbCanvas(297 / 210)], bbName() + '.pdf', msg); } catch (er) { msg.textContent = '⚠ ' + er.message; } return; }
+      });
+      box.addEventListener('change', function (e) {   // 참석 체크 → 회의록 출석(B.absent)과 같은 칸
+        var n = e.target.getAttribute('data-bbatt'); if (n == null) return;
+        var B = boardData().B; B.absent = B.absent || {}; if (e.target.checked) delete B.absent[n]; else B.absent[n] = true;
+        save(); e.target.blur(); rer();
       });
       box.addEventListener('focusout', function () { setTimeout(function () { if (!box.contains(document.activeElement)) rer(); }, 0); });
     })();
@@ -5957,10 +6042,17 @@ body{
         if (k) { B[k] = el.type === 'checkbox' ? el.checked : el.value; saveSoon(); if (el.type === 'checkbox') { el.blur(); renderBoard(); } return; }
         var ai = el.getAttribute('data-bdag');
         if (ai != null) {   // 안건 이름: 직접 고친 문장이 없으면 회의 내용을 새로 만듦
-          var o2 = B.agendas[+ai] || ''; if (B.agDesc && o2 !== el.value && B.agDesc[o2] != null) { B.agDesc[el.value] = B.agDesc[o2]; delete B.agDesc[o2]; }   // 안내문에서 적은 내용도 새 이름으로
+          var o2 = B.agendas[+ai] || ''; [B.agDesc, B.agMemo, B.agVote].forEach(function (Dx) { if (Dx && o2 !== el.value && Dx[o2] != null) { Dx[el.value] = Dx[o2]; delete Dx[o2]; } });   // 안내문에서 적은 내용도 새 이름으로
           B.agendas[+ai] = el.value; B.agText = B.agText || {};
           var man = B.agText[+ai] != null && String(B.agText[+ai]).trim();
           if (!man) { var ta = box.querySelector('textarea[data-bdtx="' + ai + '"]'); if (ta) ta.value = el.value.trim() ? boardAgendaText(+ai, boardCtx()) : ''; }
+          saveSoon(); return;
+        }
+        var mi = el.getAttribute('data-bdmemo');
+        if (mi != null) {   // 회의 메모 → 직접 고친 문장이 없으면 회의 내용을 바로 새로 만듦
+          var mq = B.agendas[+mi] || '', MD = B.agMemo = B.agMemo || {}; if (el.value.trim()) MD[mq] = el.value; else delete MD[mq];
+          var man2 = (B.agText || {})[+mi] != null && String(B.agText[+mi]).trim();
+          if (!man2) { var ta2 = box.querySelector('textarea[data-bdtx="' + mi + '"]'); if (ta2) ta2.value = boardAgendaText(+mi, boardCtx()); }
           saveSoon(); return;
         }
         var ti = el.getAttribute('data-bdtx');
@@ -5969,13 +6061,25 @@ body{
       box.addEventListener('change', function (e) {
         var n = e.target.getAttribute('data-bdatt'); if (n == null) { if (e.target.id === 'bdMonth') { e.target.blur(); renderBoard(); } return; }
         var B = boardData().B; B.absent = B.absent || {}; if (e.target.checked) delete B.absent[n]; else B.absent[n] = true;
-        save(); e.target.blur(); renderBoard();
+        save(); e.target.blur(); renderBoard(); try { renderBrief(); } catch (er) { }   // 안내문 참석 체크도 같이
       });
       box.addEventListener('click', function (e) {
-        var B = boardData().B, d = e.target.getAttribute('data-bdagdel');
+        var B = boardData().B, d = e.target.getAttribute('data-bdagdel'), vt = e.target.getAttribute('data-bdv');
+        var va = e.target.getAttribute('data-bdvall');
+        if (va != null) {   // 전원 찬성 (한 번 더 누르면 모두 취소)
+          var aq = B.agendas[+va] || '', AV = B.agVote = B.agVote || {}, att = boardCtx().dInL.map(function (o) { return o.name; }), cur = AV[aq] || {};
+          if (att.length && att.every(function (n) { return cur[n] === 'y'; })) delete AV[aq]; else { AV[aq] = {}; att.forEach(function (n) { AV[aq][n] = 'y'; }); }
+          var sy2 = window.scrollY; save(); e.target.blur(); renderBoard(); window.scrollTo(0, sy2); return;
+        }
+        if (vt != null) {   // 찬성·반대·기권 버튼
+          var pv = vt.split('|'), vq = B.agendas[+pv[0]] || '', VV = B.agVote = B.agVote || {}, vm = VV[vq] = VV[vq] || {};
+          if (vm[pv[1]] === pv[2]) delete vm[pv[1]]; else vm[pv[1]] = pv[2];
+          if (!Object.keys(vm).length) delete VV[vq];
+          var sy = window.scrollY; save(); e.target.blur(); renderBoard(); window.scrollTo(0, sy); return;
+        }
         if (e.target.id === 'bdAgAdd') { B.agendas.push(''); save(); e.target.blur(); renderBoard(); var qs = box.querySelectorAll('input[data-bdag]'); if (qs.length) qs[qs.length - 1].focus(); return; }
         if (d != null) {   // 안건을 지우면 뒤 안건의 직접 고친 문장도 한 칸씩 당김
-          var T = B.agText || {}, NT = {}, dq = B.agendas.splice(+d, 1)[0]; if (B.agDesc) delete B.agDesc[dq];
+          var T = B.agText || {}, NT = {}, dq = B.agendas.splice(+d, 1)[0]; if (B.agDesc) delete B.agDesc[dq]; if (B.agMemo) delete B.agMemo[dq]; if (B.agVote) delete B.agVote[dq];
           Object.keys(T).forEach(function (k2) { var k3 = +k2; if (k3 < +d) NT[k3] = T[k2]; else if (k3 > +d) NT[k3 - 1] = T[k2]; }); B.agText = NT;
           save(); e.target.blur(); renderBoard();
         }
