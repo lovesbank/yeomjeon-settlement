@@ -1034,6 +1034,14 @@ body{
   #ledger table.grid tr.sum > td, #ledger table.grid tr.k > td, #ledger .offt tr.k > td{ background:#fff3d6 !important; font-weight:800; }
   #ledger table.grid tr.sum > td.lbl, #ledger table.grid td.month{ color:#1f3a68; font-weight:800; }
   #ledger table.grid td.lbl, #ledger table.grid td.month, #ledger .cv-tbl tr td:first-child{ background:#eef3fb !important; }
+  /* ── 조금 더 화려하게 (색만, 2026-11-08): 머리줄·이름 칸·합계 줄·줄무늬·소제목 ── */
+  #ledger table.grid th, #ledger table.grid tr.head th, #ledger table.grid thead th, #ledger .bz-tbl th, #ledger .cv-tbl th, #ledger .offt th{
+    background:linear-gradient(#e2ecfa,#c3d6f0) !important; color:#12346a !important; font-weight:800 !important; border-color:#86a2cb !important;
+  }
+  #ledger table.grid td.lbl, #ledger table.grid td.month, #ledger .cv-tbl tr td:first-child{ background:linear-gradient(90deg,#f1f6fd,#d9e6f8) !important; color:#12346a; font-weight:800; }
+  #ledger table.grid tr.sum > td, #ledger table.grid tr.k > td, #ledger .offt tr.k > td, #ledger .bz-tbl tr.k td{ background:linear-gradient(#fff4cc,#fbe29c) !important; color:#143a63; font-weight:800; border-color:#dcc16f !important; }
+  #ledger table.grid tbody tr:nth-child(even) > td:not(.lbl):not([rowspan]){ background-color:#eef4fc; }
+  #ledger .cv-h{ border-left:6px solid #2f5d9a; background:linear-gradient(90deg,#e4edfb,rgba(255,255,255,0)); padding:3px 8px; border-radius:2px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   #ledger .off-note{ background:linear-gradient(#f3fbf6,#e8f6ee) !important; border-color:#3e8e5e !important; border-radius:8px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   #ledger .off-note-h{ color:#1f6b40 !important; font-weight:800; }
   #ledger .bz-end .seal-in{ position:relative; display:inline-block; }
