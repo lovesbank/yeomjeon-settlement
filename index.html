@@ -6231,8 +6231,30 @@ body{
       newPage(true);
       g.font = font(11); g.fillStyle = '#111';
       wrap(gmGreet(d), mm(R - 11)).forEach(function (w) { g.fillText(w, mm(11), mm(y)); y += LH; }); y += LH * 0.6;
-      var lines = gmLines(d), att = gmAttachLines(d);
+      var lines = gmLines(d), att = gmAttachLines(d), photos = d.photos || [], used = {};
+      function drawPhotos(list) {   // 본문 사진: 크기 상자(종이 가로·세로 %)에 맞춤, 비율 유지. 한 줄에 들어가는 만큼 옆으로 나란히, 넘치면 다음 줄. 자리가 모자라면 다음 장
+        var maxW = R - 11, GAP = 4, row = [], rw = 0, rp = 0;   // rp = 이 줄 사진들의 가로 % 합 (100% 이하면 한 줄에 나란히)
+        function flush() {
+          if (!row.length) return;
+          if (rw > maxW) { var sh = (maxW - GAP * (row.length - 1)) / (rw - GAP * (row.length - 1)); row.forEach(function (r) { r.w *= sh; r.h *= sh; }); rw = maxW; }   // 여백 때문에 넘치면 줄 전체를 같은 비율로 살짝 줄임
+          var rh = Math.max.apply(null, row.map(function (r) { return r.h; })), top = y - LH * 0.5 + LH * 0.4;
+          if (top + rh > BOTTOM - 8) { newPage(false); top = y - LH * 0.5; }
+          var x = 11 + (maxW - rw) / 2;
+          row.forEach(function (r) { g.drawImage(r.im, mm(x), mm(top + (rh - r.h) / 2), mm(r.w), mm(r.h)); x += r.w + GAP; });
+          y = top + rh + LH * 1.1; row = []; rw = 0; rp = 0;
+        }
+        list.forEach(function (i) {
+          var p = photos[i], ims = p && p.key && gmImgs[p.key], im = ims && ims[0]; used[i] = 1; if (!im || !im.naturalWidth) return;
+          var B = gmBoxOf(p, false), room = BOTTOM - 8 - 20, f = gmFitBox(im.naturalWidth, im.naturalHeight, Math.min(maxW, PW * B.gw / 100), Math.min(room, PH * B.gh / 100)), w = f.w, h = f.h;
+          var pc = w / PW * 100;   // 실제 가로 % (종이 기준)
+          if (row.length && rp + pc > 100.5) flush();
+          rw = row.length ? rw + GAP + w : w; rp += pc; row.push({ im: im, w: w, h: h });
+        });
+        flush();
+      }
       lines.forEach(function (ln, idx) {
+        var pt0 = String(ln.t).replace(/\s*끝\.?$/, ''), pm = !ln.mk && /^(\[\s*사진\s*\d{1,2}\s*\]\s*)+$/.test(pt0);   // 「[사진1] [사진2]」처럼 한 줄에 여러 개면 나란히
+        if (pm) { drawPhotos(pt0.match(/\d{1,2}/g).map(function (n) { return +n - 1; })); if (/끝\.?$/.test(ln.t)) { g.font = font(11); g.fillStyle = '#111'; g.fillText('끝.', mm(11), mm(y)); y += LH; } return; }
         g.font = font(11); var ta2 = g.measureText('가').width / k, x0 = 11 + Math.max(0, ln.lv) * ta2, mk = ln.mk ? ln.mk + ' ' : '', hang = mk ? g.measureText(mk).width / k : 0;   // 한 단계 = 2타(한 글자)
         if (ln.lv === 0 && idx > 0) y += 1.2;   // 큰 번호 앞은 조금 띄움
         if (!ln.t && !mk) { y += LH * 0.6; return; }
@@ -6243,6 +6265,7 @@ body{
           g.fillText(w, mm(x0) + mm(hang), mm(y)); y += LH;
         });
       });
+      drawPhotos(photos.map(function (p, i) { return i; }).filter(function (i) { return !used[i]; }));   // 자리 표시([사진N])가 없는 사진은 본문 끝에
       // 붙임 + 발신 명의는 마지막 장 아래쪽에 함께 (자리가 모자라면 새 장)
       g.font = font(11); var labW = g.measureText('붙임  ').width / k, attW = [];   // [{t, x}] 「붙임」 다음 2타에서 시작, 여러 개면 번호 다음 글자에 맞춰 줄바꿈
       att.forEach(function (t) { var mm2 = t.match(/^(\d+\.\s)/), hg = mm2 ? g.measureText(mm2[1]).width / k : 0; wrap(t, mm(R - 11 - labW) - mm(hg)).forEach(function (w, i) { attW.push({ t: w, x: 11 + labW + (i ? hg : 0) }); }); });
@@ -6312,25 +6335,72 @@ body{
         rd.onerror = function () { no(rd.error); }; rd.readAsDataURL(f);
       });
     }
+    /* 사진 크기 = A4 종이의 가로 ○% · 세로 ○% 상자 안에 들어오게 (그림 비율은 그대로 두고 상자에 맞춤)
+       본문 사진 기본: 가로 45%(두 장 나란히) · 세로 100%, 붙임 사진 기본: 가로 88%(종이 폭 가득) · 세로 100% */
+    function gmBoxOf(it, isAtt) {
+      var gw = +it.gw, gh = +it.gh;
+      if (!(gw > 0)) gw = isAtt ? (it.w ? Math.round(+it.w * 0.88) : 88) : (it.w ? Math.round(+it.w / 210 * 100) : 45);   // 예전 값(w)이 있으면 이어받음
+      if (!(gh > 0)) gh = 100;
+      return { gw: Math.max(10, Math.min(100, gw)), gh: Math.max(10, Math.min(100, gh)) };
+    }
+    function gmFitBox(nw, nh, bw, bh) { var sc = Math.min(bw / nw, bh / nh); return { w: nw * sc, h: nh * sc }; }
+    function gmSizeCtl(kind, i, it, im) {   // kind: 'b' 본문 · 'a' 붙임
+      var B = gmBoxOf(it, kind === 'a'), bs = 'style="display:inline-block;margin:2px 2px;font-size:16px;padding:5px 11px"', ps = 'style="display:inline-block;margin:2px 2px;font-size:14px;padding:4px 8px"';
+      function row(k, lab) {
+        var v = B[k], a = 'data-gmsz="' + kind + '" data-i="' + i + '" data-k="' + k + '"';
+        return '<div style="margin:3px 0 3px 1.6em;font-size:16px">' + lab + ' <b style="display:inline-block;min-width:3.2em">' + v + '%</b>' +
+          '<button type="button" class="cv-add" ' + a + ' data-d="-10" ' + bs + (v <= 10 ? ' disabled' : '') + '>－</button>' +
+          '<button type="button" class="cv-add" ' + a + ' data-d="10" ' + bs + (v >= 100 ? ' disabled' : '') + '>＋</button> ' +
+          [30, 50, 70, 100].map(function (n) { return '<button type="button" class="cv-add" ' + a + ' data-v="' + n + '" ' + ps + (n === v ? ' disabled' : '') + '>' + n + '%</button>'; }).join('') + '</div>';
+      }
+      var real = '';
+      if (im && im.naturalWidth) {   // 실제로 그려지는 크기 (A4 기준 %)
+        var f = kind === 'a' ? gmFitBox(im.naturalWidth, im.naturalHeight, Math.min(88, B.gw) * 210 / 100, Math.min(88, B.gh) * 297 / 100)
+                             : gmFitBox(im.naturalWidth, im.naturalHeight, Math.min(190, 210 * B.gw / 100), Math.min(252, 297 * B.gh / 100));
+        real = '<div class="bz-hint" style="margin-left:1.6em">→ 실제 크기: 종이 가로의 ' + Math.round(f.w / 210 * 100) + '% · 세로의 ' + Math.round(f.h / 297 * 100) + '% (그림 비율은 그대로)</div>';
+      }
+      return row('gw', '가로') + row('gh', '세로') + real;
+    }
+    function gmAttachPages(ims, W, H) {   // 붙임 사진을 쪽에 위아래로: 크기 상자(종이 가로·세로 %)에 맞추고, 한 쪽에 들어가는 만큼 차례로 (모자라면 다음 쪽)
+      var M = Math.round(W * 0.06), GAP = Math.round(W * 0.04), AW = W - 2 * M, AH = H - 2 * M, groups = [], cur = null;
+      ims.forEach(function (x) {   // x = 그림 또는 { im: 그림, gw: 가로 %, gh: 세로 % }
+        var im = x && x.im ? x.im : x;
+        if (!im || !im.naturalWidth) return;
+        var f = gmFitBox(im.naturalWidth, im.naturalHeight, Math.min(AW, W * (x.gw || 100) / 100), Math.min(AH, H * (x.gh || 100) / 100)), w = f.w, h = f.h;
+        if (!cur || cur.h + GAP + h > AH) { cur = { items: [], h: -GAP }; groups.push(cur); }
+        cur.items.push({ im: im, w: w, h: h }); cur.h += GAP + h;
+      });
+      return groups.map(function (gr) {
+        var c = document.createElement('canvas'); c.width = W; c.height = H; var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+        var y = M + (AH - gr.h) / 2;
+        gr.items.forEach(function (it) { g.drawImage(it.im, (W - it.w) / 2, y, it.w, it.h); y += it.h + GAP; });
+        return c;
+      });
+    }
     function gmAllCanvases() {   // 공문 + 붙임 파일 쪽들
-      var d = gmDoc(), list = gmPages({ phone: true });   // 사진: 휴대폰 화면 비율로 글자를 키워 한 화면에
+      var d = gmDoc(), list;
+      return Promise.all((d.photos || []).map(function (p) { return p.key ? gmLoadImgs(p.key) : Promise.resolve([]); })).then(function () {
+      list = gmPages({ phone: true });   // 사진: 휴대폰 화면 비율로 글자를 키워 한 화면에
       return Promise.all((d.attach || []).map(function (a) { return a.key ? gmLoadImgs(a.key) : Promise.resolve([]); })).then(function (sets) {
-        sets.forEach(function (ims) { ims.forEach(function (im) {   // 붙임 쪽도 휴대폰 화면 비율(1 : 1.95) 안에 가운데로
-          var c = document.createElement('canvas'), W = 1080, H = Math.round(W * 1.95), sc = Math.min(W / im.naturalWidth, H / im.naturalHeight), w = im.naturalWidth * sc, h = im.naturalHeight * sc; c.width = W; c.height = H;
-          var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(im, (W - w) / 2, (H - h) / 2, w, h); list.push(c);
-        }); });
-        return list;
+        var all = []; sets.forEach(function (ims, k) { var a = (d.attach || [])[k] || {}; var B = gmBoxOf(a, true); ims.forEach(function (im) { all.push({ im: im, gw: B.gw, gh: B.gh }); }); });   // 붙임 쪽도 휴대폰 화면 비율(1 : 1.95)
+        return list.concat(gmAttachPages(all, 1080, Math.round(1080 * 1.95)));
+      });
       });
     }
     function gmName() { var d = gmDoc(); return '공문_' + String(d.date || '').replace(/-/g, '') + (d.title ? '_' + String(d.title).replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30) : ''); }
     var gmTimer = null;
     function gmPreviewSoon() { clearTimeout(gmTimer); gmTimer = setTimeout(gmPaint, 300); }
     var gmPrintHtml = '';   // PDF용: 공문 쪽 + 붙임 쪽 (미리 만들어 둬서 버튼을 누르면 바로 인쇄 창)
+    function gmAfterLoad() {   // 사진을 다 불러오면: 입력 중이 아니면 화면 전체(실제 크기 안내 포함), 입력 중이면 미리보기만
+      var bx = $('gmBox'); if (bx && !bx.contains(document.activeElement)) renderGongmun(); else gmPaint();
+    }
     function gmPaint() {
       var box = $('gmPrev'); if (!box) return;
       try {
         var pg = gmPages().map(function (c) { return c.toDataURL('image/png'); }), d = gmDoc(), wait = false, att = [];
-        (d.attach || []).forEach(function (a) { if (!a.key) return; if (gmImgs[a.key]) gmImgs[a.key].forEach(function (im) { att.push(im.src); }); else { wait = true; gmLoadImgs(a.key).then(function () { gmPaint(); }); } });
+        (d.photos || []).forEach(function (p) { if (p.key && !gmImgs[p.key]) { wait = true; gmLoadImgs(p.key).then(gmAfterLoad); } });
+        (d.attach || []).forEach(function (a) { if (!a.key) return; if (gmImgs[a.key]) (function (B) { gmImgs[a.key].forEach(function (im) { att.push({ im: im, gw: B.gw, gh: B.gh }); }); })(gmBoxOf(a, true)); else { wait = true; gmLoadImgs(a.key).then(gmAfterLoad); } });
+        att = wait ? [] : gmAttachPages(att, 1654, 2339).map(function (c) { return c.toDataURL('image/jpeg', 0.9); });   // A4 한 쪽에 들어가는 만큼
         box.innerHTML = pg.map(function (u) { return '<img class="gm-pg" alt="공문 미리보기" src="' + u + '">'; }).join('') + (att.length ? '<p class="bz-hint">붙임 ' + att.length + '쪽이 공문 뒤에 이어 붙습니다.</p>' : '');
         gmPrintHtml = pg.concat(att).map(function (u) { return '<img class="gm-pg" alt="" src="' + u + '">'; }).join('');
         if (wait) gmPrintHtml = '';
@@ -6350,8 +6420,12 @@ body{
         '<p>제목 ' + inp('title', '예: REC 관련하여 본사의 입장', 'w') + '</p>' +
         '<p>인사말 ' + inp('greet', gmGreet(Object.assign({}, d, { greet: '' })), 'w') + ' <span class="bz-hint">비우면 수신에 맞춰 자동</span></p>' +
         '<p>본문 <span class="bz-hint">(한 줄에 한 항목 · 1. → 가. → 1) → 가) → (1) → (가) → ① → ㉮ 순서로 쓰면 공문서 규칙대로 두 칸씩 들여쓰고 둘째 줄을 맞춥니다)</span></p><textarea class="cv-purpose" data-gm="body" rows="14" placeholder="1. 본 건의 개요&#10;가. 본 건은 …&#10;2. 요청 사항&#10;가. …">' + esc(d.body || '') + '</textarea>' +
-        '<p><b>붙임 파일</b> <label class="cv-add" style="display:inline-block;margin:0">📎 사진·PDF 붙이기<input type="file" id="gmFile" accept="image/*,application/pdf,.pdf" multiple hidden></label> <span class="bz-hint" id="gmFileMsg">붙인 파일은 이 기기에만 보관되고 공문 뒤에 이어 붙어 저장됩니다.</span></p>' +
-        (d.attach || []).map(function (a, i) { return '<p style="margin-left:1em">' + (i + 1) + '. <input data-gma="' + i + '" data-f="name" class="w" value="' + esc(a.name || '') + '" placeholder="붙임 이름"> <input data-gma="' + i + '" data-f="copies" value="' + esc(a.copies || 1) + '" style="width:3em" inputmode="numeric">부 ' + (a.key ? '<span class="bz-hint">' + (a.pages || 0) + '쪽 붙음</span>' : '<span class="bz-hint">(파일 없이 이름만)</span>') + ' <button type="button" class="cv-del" data-gmadel="' + i + '">－</button></p>'; }).join('') +
+        '<p><b>본문 사진</b> <label class="cv-add" style="display:inline-block;margin:0;font-size:17px;padding:8px 16px">📷 본문에 사진 넣기<input type="file" id="gmPhoto" accept="image/*" multiple hidden></label> <span class="bz-hint" id="gmPhotoMsg">공문 본문 안에 들어갑니다. 본문에 「[사진1]」처럼 한 줄을 적으면 그 자리에, 안 적으면 본문 끝에 들어갑니다. 크기는 종이(A4) 가로·세로의 몇 %까지 들어오게 할지 고릅니다(그림 비율은 그대로). 가로를 줄이면 옆으로 나란히 놓입니다(「[사진1] [사진2]」처럼 한 줄에 적어도 나란히). 사진은 이 기기에만 보관됩니다.</span></p>' +
+        (d.photos || []).map(function (p, i) { var im = p.key && gmImgs[p.key] && gmImgs[p.key][0]; return '<div style="margin:8px 0 8px 1em;padding:6px 0;border-top:1px dashed #cfd6e4;font-size:16px"><b>[사진' + (i + 1) + ']</b> ' +
+          '<button type="button" class="cv-add" data-gmpmv="' + i + '" style="display:inline-block;margin:0 4px;font-size:15px;padding:6px 12px">📎 붙임으로 옮기기</button>' +
+          '<button type="button" class="cv-del" data-gmpdel="' + i + '" style="width:auto;height:auto;padding:6px 10px;font-size:15px">지우기</button>' + gmSizeCtl('b', i, p, im) + '</div>'; }).join('') +
+        '<p><b>붙임 파일</b> <label class="cv-add" style="display:inline-block;margin:0">📎 붙임에 사진·PDF 넣기<input type="file" id="gmFile" accept="image/*,application/pdf,.pdf" multiple hidden></label> <span class="bz-hint" id="gmFileMsg">붙인 파일은 이 기기에만 보관되고 공문 뒤에 이어 붙어 저장됩니다. 세로를 줄이면 한 쪽에 여러 장이 위아래로 들어갑니다.</span></p>' +
+        (d.attach || []).map(function (a, i) { return '<p style="margin-left:1em">' + (i + 1) + '. <input data-gma="' + i + '" data-f="name" class="w" value="' + esc(a.name || '') + '" placeholder="붙임 이름"> <input data-gma="' + i + '" data-f="copies" value="' + esc(a.copies || 1) + '" style="width:3em" inputmode="numeric">부 ' + (a.key ? '<span class="bz-hint">' + (a.pages || 0) + '쪽 붙음</span>' : '<span class="bz-hint">(파일 없이 이름만)</span>') + (a.key && a.pages === 1 ? ' <button type="button" class="cv-add" data-gmamv="' + i + '" style="display:inline-block;margin:0 4px;font-size:15px;padding:6px 12px">📷 본문으로 옮기기</button>' : '') + ' <button type="button" class="cv-del" data-gmadel="' + i + '">－</button>' + (a.key ? gmSizeCtl('a', i, a, gmImgs[a.key] && gmImgs[a.key][0]) : '') + '</p>'; }).join('') +
         '<p style="margin-left:1em"><button type="button" class="cv-add" id="gmAttName" style="display:inline-block">＋ 파일 없이 붙임 이름만 추가</button></p>' +
         '<details><summary>회사 정보 (주소·전화·팩스·발신 명의 — 한 번 적으면 이 기기에 기억)</summary>' + cfg('addr', '주소') + cfg('tel', '전화') + cfg('fax', '팩스') + cfg('from', '발신') + cfg('co', '회사 이름 줄') + cfg('ceo', '대표 이름 줄') + '</details>' +
         '<p><button type="button" class="cv-add" id="gmPng" style="display:inline-block">📷 사진으로 저장</button> <button type="button" class="cv-add" data-pdf="gongmun" style="display:inline-block">📄 PDF로 저장</button> <span class="bz-hint" id="gmMsg"></span></p>' +
@@ -6369,6 +6443,18 @@ body{
       box.addEventListener('change', function (e) {
         var el = e.target, G = gmData();
         if (el.id === 'gmSel') { G.cur = +el.value; save(); el.blur(); renderGongmun(); return; }
+        if (el.id === 'gmPhoto') {
+          var pf = Array.prototype.slice.call(el.files || []), pd = gmDoc(), pmsg = $('gmPhotoMsg'); el.value = ''; if (!pf.length) return;
+          if (pmsg) pmsg.textContent = '사진을 넣는 중…';
+          pf.reduce(function (pr, f) {
+            return pr.then(function () { return gmFileToUrls(f); }).then(function (urls) {
+              var key = pd.id + '_ph_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+              return gmIdb('readwrite', function (st) { return st.put(urls.slice(0, 1), key); }).then(function () { delete gmImgs[key]; pd.photos = pd.photos || []; pd.photos.push({ key: key, gw: 45, gh: 100 }); save(); });
+            });
+          }, Promise.resolve()).then(function () { renderGongmun(); var m3 = $('gmPhotoMsg'); if (m3) m3.textContent = '✔ 사진을 넣었습니다. ＋/－로 크기를 맞추세요.'; })
+            .catch(function (err) { renderGongmun(); var m3 = $('gmPhotoMsg'); if (m3) m3.textContent = '⚠ ' + (err && err.message || err); });
+          return;
+        }
         if (el.id === 'gmFile') {
           var fs = Array.prototype.slice.call(el.files || []), d = gmDoc(), msg = $('gmFileMsg'); el.value = ''; if (!fs.length) return;
           if (msg) msg.textContent = '붙임 파일을 넣는 중…';
@@ -6391,10 +6477,24 @@ body{
         if (t.id === 'gmNew') { G.list.push(gmNew()); G.cur = G.list.length - 1; save(); renderGongmun(); return; }
         if (t.id === 'gmDel') {
           if (!window.confirm('이 공문을 지울까요? (붙임 파일도 함께 지워집니다)')) return;
-          (d.attach || []).forEach(function (a) { if (a.key) gmIdb('readwrite', function (st) { return st.delete(a.key); }).catch(function () { }); });
+          (d.attach || []).concat(d.photos || []).forEach(function (a) { if (a.key) gmIdb('readwrite', function (st) { return st.delete(a.key); }).catch(function () { }); });
           G.list.splice(G.cur, 1); G.cur = Math.max(0, G.cur - 1); save(); renderGongmun(); return;
         }
         if (t.id === 'gmAttName') { d.attach = d.attach || []; d.attach.push({ name: '', copies: 1 }); save(); renderGongmun(); var q = box.querySelectorAll('input[data-gma][data-f="name"]'); if (q.length) q[q.length - 1].focus(); return; }
+        var gsz = t.getAttribute('data-gmsz');   // 사진 크기: 종이 가로·세로 %  (－/＋ 10%씩, 또는 30·50·70·100% 바로)
+        if (gsz) {
+          var it = (gsz === 'a' ? d.attach : d.photos || [])[+t.getAttribute('data-i')];
+          if (it) { var B0 = gmBoxOf(it, gsz === 'a'), k2 = t.getAttribute('data-k'); it.gw = B0.gw; it.gh = B0.gh;
+            var nv = t.hasAttribute('data-v') ? +t.getAttribute('data-v') : B0[k2] + (+t.getAttribute('data-d') || 0);
+            it[k2] = Math.max(10, Math.min(100, nv)); save(); renderGongmun(); }
+          return;
+        }
+        var pmv = t.getAttribute('data-gmpmv');   // 본문 사진 → 붙임 (같은 사진 그대로, 붙임 이름은 고쳐 쓰면 됨)
+        if (pmv != null) { var ph3 = d.photos.splice(+pmv, 1)[0]; if (ph3) { d.attach = d.attach || []; var Bm = gmBoxOf(ph3, false); d.attach.push({ name: '첨부 사진', copies: 1, key: ph3.key, pages: 1, gw: Bm.gw, gh: Bm.gh }); } save(); renderGongmun(); return; }
+        var amv = t.getAttribute('data-gmamv');   // 붙임(한 쪽짜리) → 본문 사진
+        if (amv != null) { var a3 = d.attach.splice(+amv, 1)[0]; if (a3 && a3.key) { d.photos = d.photos || []; var Ba = gmBoxOf(a3, true); d.photos.push({ key: a3.key, gw: Ba.gw, gh: Ba.gh }); } save(); renderGongmun(); return; }
+        var pdel = t.getAttribute('data-gmpdel');
+        if (pdel != null) { if (!window.confirm('이 사진을 지울까요?')) return; var ph2 = d.photos[+pdel]; if (ph2 && ph2.key) gmIdb('readwrite', function (st) { return st.delete(ph2.key); }).catch(function () { }); d.photos.splice(+pdel, 1); save(); renderGongmun(); return; }
         var del = t.getAttribute('data-gmadel');
         if (del != null) { var a = d.attach[+del]; if (a && a.key) gmIdb('readwrite', function (st) { return st.delete(a.key); }).catch(function () { }); d.attach.splice(+del, 1); save(); renderGongmun(); return; }
         if (t.id === 'gmPng') {
