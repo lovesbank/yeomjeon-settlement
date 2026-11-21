@@ -986,7 +986,7 @@ body{
     body.pm-report #report .stage{ padding:0 !important; overflow:visible; }
     body.pm-report #report .sheetWrap{ left:0 !important; transform:none !important; margin:0 auto !important; zoom:var(--pz, .76); }   /* A4 한 장에 맞춤 */
     body.pm-annual #ledger section.lsheet, body.pm-min #ledger section.lsheet, body.pm-board #ledger section.lsheet{ display:none !important; }
-    body.pm-annual #ledger section#sec-title,body.pm-annual #ledger section#sec-cover,body.pm-annual #ledger section#sec-toc,body.pm-annual #ledger section#sec-biz,body.pm-annual #ledger section#sec-cmp,body.pm-annual #ledger section#sec-audit,body.pm-annual #ledger section#sec-off,body.pm-annual #ledger section#sec-revenue,body.pm-annual #ledger section#sec-expense,body.pm-annual #ledger section#sec-items,body.pm-annual #ledger section#sec-summary,body.pm-annual #ledger section#sec-accounts,body.pm-annual #ledger section#sec-resol{ display:block !important; }
+    body.pm-annual #ledger section#sec-title,body.pm-annual #ledger section#sec-cover,body.pm-annual #ledger section#sec-toc,body.pm-annual #ledger section#sec-biz,body.pm-annual #ledger section#sec-cmp,body.pm-annual #ledger section#sec-audit,body.pm-annual #ledger section#sec-off,body.pm-annual #ledger section#sec-revenue,body.pm-annual #ledger section#sec-expense,body.pm-annual #ledger section#sec-summary,body.pm-annual #ledger section#sec-accounts,body.pm-annual #ledger section#sec-resol{ display:block !important; }
     body.pm-annual #ledger section#sec-resol{ break-after:auto !important; page-break-after:auto !important; }
     body.pm-annual #ledger section#sec-summary{ break-after:auto !important; page-break-after:auto !important; }   /* 수입·지출과 통장잔액은 한 장에 */
     body.pm-holders #report, body.pm-notice #report, body.pm-proxy #report, body.pm-gongmun #report{ display:none !important; } body.pm-holders #ledger section.lsheet, body.pm-notice #ledger section.lsheet, body.pm-proxy #ledger section.lsheet, body.pm-gongmun #ledger section.lsheet{ display:none !important; }
@@ -4343,10 +4343,9 @@ body{
       ];
       if (q) npl.push('【작년과 비교】 작년(' + prv.y + '년 1~' + prv.K + '월) 당기순이익은 ' + w(q.ni) + ', 주민 피해보상금은 ' + w(aq['보상금']) + '이었습니다.');
       var nre = [
-        '이익잉여금처분계산서는 그동안 쌓인 이익을 어떻게 나누거나 남겼는지 보여 주는 표입니다.',
-        '【계산】 작년 말까지 쌓인 이익 ' + w(cur.o.re) + ' + 올해 이익 ' + w(r.ni) + ' = ' + w(c.re) + '입니다.',
-        '【배당】 올해는 주주 배당을 하지 않았으므로 ' + w(c.re) + '이 그대로 다음 해로 넘어갑니다 (차기이월).',
-        '【통장 잔액과의 관계】 이익잉여금은 통장 잔액과 같은 돈이 아닙니다. 현금 ' + w(c.cash) + ' + 태양광 설비 ' + w(c.facility) + ' − 갚을 빚 ' + w(debt) + ' − 자본금 ' + w(c.capital) + ' = ' + w(c.re) + '입니다.'
+        '이익잉여금은 회사를 세운 뒤 해마다 「번 돈 − 쓴 돈」으로 남은 이익을 차곡차곡 모은 합계(회사의 살림 밑천)입니다. 주민 피해보상금은 비용으로 먼저 빠지므로, 보상금을 드리고 난 뒤 남은 이익입니다.',
+        '【올해 계산】 작년 말까지 모인 이익 ' + w(cur.o.re) + ' + 올해 남은 이익(당기순이익) ' + w(r.ni) + ' = ' + w(c.re) + '입니다. 올해는 주주 배당을 하지 않아 모두 내년으로 넘어갑니다(차기이월).',
+        '【통장 돈과 다른 이유】 이익잉여금이 모두 통장에 있는 것은 아닙니다. 통장 현금은 ' + w(c.cash) + '이고, 나머지는 태양광 설비(지금 장부상 가치 ' + w(c.facility) + ')를 마련하는 데 들어가 있습니다.'
       ];
       return {
         nbs: noteOv('nbs-' + cur.y, nbs), npl: noteOv('npl-' + cur.y, npl), nre: noteOv('nre-' + cur.y, nre),
@@ -4630,12 +4629,12 @@ body{
     var TOC_LIST = [
       ['영업보고서', '올해 사업 실적과 주요 사업 내용'], ['영업보고서 - 전년 대비 실적 비교', '작년 같은 기간과 비교'], ['감사보고서', '감사의 확인 결과'],
       ['재무상태표', '재산 · 빚 · 자본'], ['손익계산서', '한 해 동안 번 돈과 쓴 돈'], ['이익잉여금처분계산서', '쌓인 이익과 처리'],
-      ['SMP · REC 매출액', '월별 전기 판매 수입'], ['지출내역서', '월별 지출 명세'], ['항목별 연간 합계 · 수입 · 지출', '항목별 지출과 월별 수입 · 지출'],
+      ['SMP · REC 매출액', '월별 전기 판매 수입'], ['지출내역서', '월별 지출 명세'], ['수입 · 지출', '월별 수입 · 지출'],
       ['현재통장 잔액', '은행별 잔액'], ['이사회 결의서', '결산 보고서 제출 결의'],
       ['은행거래내역서', '통장 입출금 내역 사본 (첨부)']
     ];
     // 짐작 쪽 (표지 1쪽, 결산 앞장 2쪽, 차례 3쪽 기준, 결산 보고서를 맨 앞에 넣으면 +1). null = 첨부 서류라 직접 적는 칸
-    var TOC_GUESS = [4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, null];
+    var TOC_GUESS = [4, 5, 6, 7, 8, 9, 10, 11, 13, 13, 14, null];   // 항목별 연간 합계 쪽을 뺀 뒤 (2026-11-22): 수입·지출과 통장 잔액이 13쪽 한 장
     // 직접 적은 쪽은 그대로, 비어 있으면 짐작값 (첨부 서류는 빈칸)
     function tocPage(i, withReport) { var T = db.toc || {}; if (+T[i]) return String(+T[i]); return TOC_GUESS[i] == null ? '' : String(TOC_GUESS[i] + (withReport ? 1 : 0)); }
     function tocPages() { return TOC_LIST.map(function (x, i) { return tocPage(i, false); }); }
@@ -7301,7 +7300,7 @@ body{
       }
       return pages;
     }
-    var ANNUAL_IDS = ['sec-title', 'sec-cover', 'sec-toc', 'sec-biz', 'sec-cmp', 'sec-audit', 'sec-off', 'sec-revenue', 'sec-expense', 'sec-items', 'sec-summary', 'sec-accounts', 'sec-resol'];   // 영수증은 뺌
+    var ANNUAL_IDS = ['sec-title', 'sec-cover', 'sec-toc', 'sec-biz', 'sec-cmp', 'sec-audit', 'sec-off', 'sec-revenue', 'sec-expense', 'sec-summary', 'sec-accounts', 'sec-resol'];   // 영수증은 뺌
     // PDF 쪽 그림 만들기 (A4 비율)
     function pdfCanvases(mode) {
       var A4 = 297 / 210;
@@ -7313,7 +7312,7 @@ body{
       if (mode === 'annual') return new Promise(function (ok, no) {
         setTimeout(function () {
           try {
-            var first = domSectionCanvases(ANNUAL_IDS), M = first._map || {}, keys = ['sec-biz#0', 'sec-cmp#0', 'sec-audit#0', 'sec-off#0', 'sec-off#1', 'sec-off#2', 'sec-revenue#0', 'sec-expense#0', 'sec-items#0', 'sec-accounts#0', 'sec-resol#0'];
+            var first = domSectionCanvases(ANNUAL_IDS), M = first._map || {}, keys = ['sec-biz#0', 'sec-cmp#0', 'sec-audit#0', 'sec-off#0', 'sec-off#1', 'sec-off#2', 'sec-revenue#0', 'sec-expense#0', 'sec-summary#0', 'sec-accounts#0', 'sec-resol#0'];
             var ins = document.querySelectorAll('#tocBox input[data-i]'), changed = false;   // 차례의 쪽 번호를 실제 PDF 쪽에 맞춤 (이번 PDF에만, 직접 적은 쪽은 그대로)
             keys.forEach(function (k, i) { var el = ins[i]; if (!el || M[k] == null || (db.toc && db.toc[i])) return; if (String(el.value) !== String(M[k])) { el.value = M[k]; changed = true; } });
             var out = changed ? domSectionCanvases(ANNUAL_IDS) : first;
@@ -8388,7 +8387,7 @@ body{
         fixRightEdge(doc, files);   // 지출내역서 오른쪽 바깥선을 왼쪽처럼 굵게
         shrinkIncome(doc);   // 수입·지출 표를 약간 작게 (항목별 표와 한 장에)
         useMalgun(files);   // 모든 글꼴을 맑은 고딕으로
-        insertItems(doc, Y, 17);
+        // 지출 항목별 연간 합계 표는 결산서에서 뺌 (2026-11-22 진욱 님 요청) — 화면의 표(sec-items)는 그대로
         insertResolution(doc, Y, files);
         restyleTitles(doc, Y);
         if ($('hxMinutes') && $('hxMinutes').checked) appendMinutes(doc, Y);   // 선택: 정기주주총회 의사록 (결산서와 따로 쓸 때가 많아 기본은 빼고 저장)   // 원본 양식의 연두색 제목 상자 → 다른 서류와 같은 제목 상자   // 「현재통장 잔액」은 새 쪽부터 + 그 아래 이사회 결의서(회사 직인)
